@@ -16,7 +16,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <unistd.h>
 #include <sys/mman.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
