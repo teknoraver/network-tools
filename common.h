@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <linux/if.h>
 #include <linux/if_packet.h>
+#include <netinet/if_ether.h>
 
 #define ipv4_addr(o1, o2, o3, o4) __constant_htonl( \
 	(o1) << 24 | \
@@ -23,6 +24,17 @@ static void rand_mac(unsigned char *mac)
 {
 	nrand48((unsigned short *)mac);
 	mac[0] &= 0xfe;
+}
+
+static void seed_mac(unsigned char *mac)
+{
+	struct timespec now = { 0 };
+	uint64_t ns;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	ns = now.tv_sec * now.tv_nsec;
+	memcpy(mac, &ns, ETH_ALEN);
+	rand_mac(mac);
 }
 
 static unsigned interval(struct timespec *since, struct timespec *to)

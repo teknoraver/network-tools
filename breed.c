@@ -87,13 +87,21 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 			break;
 		case 'd':
 			cfg->rand_daddr = !strcmp(optarg, "rand");
-			if (!cfg->rand_daddr && !ether_aton_r(optarg, &cfg->daddr))
-				usage(argv[0], 1);
+			if (cfg->rand_daddr) {
+				if (ether_aton_r(optarg, &cfg->daddr))
+					seed_mac(cfg->daddr.ether_addr_octet);
+				else
+					usage(argv[0], 1);
+			}
 			break;
 		case 's':
 			cfg->rand_saddr = !strcmp(optarg, "rand");
-			if (!cfg->rand_saddr && !ether_aton_r(optarg, &cfg->saddr))
-				usage(argv[0], 1);
+			if (cfg->rand_saddr) {
+				if (ether_aton_r(optarg, &cfg->saddr))
+					seed_mac(cfg->saddr.ether_addr_octet);
+				else
+					usage(argv[0], 1);
+			}
 			break;
 		case 'v':
 			cfg->verbose = 1;
@@ -199,23 +207,8 @@ int main(int argc, char *argv[])
 	pthread_t th;
 
 	setup(argc, argv, &cfg);
-
-	if (cfg.rand_daddr) {
-		uint32_t ns;
-		clock_gettime(CLOCK_MONOTONIC, &template.ts);
-		ns = template.ts.tv_nsec;
-		memcpy(template.ether.ether_dhost, &ns, sizeof(ns));
-	} else
-		memcpy(template.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
-
-	if (cfg.rand_saddr) {
-		uint32_t ns;
-		clock_gettime(CLOCK_MONOTONIC, &template.ts);
-		ns = template.ts.tv_nsec;
-		memcpy(template.ether.ether_shost, &ns, sizeof(ns));
-	} else
-		memcpy(template.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
-
+	memcpy(template.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
+	memcpy(template.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
 	pthread_create(&th, NULL, eed_calc, &cfg);
 
 	for (; !cfg.count || cfg.sent < cfg.count; cfg.sent++) {

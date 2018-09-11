@@ -20,7 +20,6 @@
 #include <sys/mman.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
-#include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 
@@ -129,13 +128,21 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 			break;
 		case 'd':
 			cfg->rand_daddr = !strcmp(optarg, "rand");
-			if (!cfg->rand_daddr && !ether_aton_r(optarg, &cfg->daddr))
-				usage(argv[0], 1);
+			if (cfg->rand_daddr) {
+				if (ether_aton_r(optarg, &cfg->daddr))
+					seed_mac(cfg->daddr.ether_addr_octet);
+				else
+					usage(argv[0], 1);
+			}
 			break;
 		case 's':
 			cfg->rand_saddr = !strcmp(optarg, "rand");
-			if (!cfg->rand_saddr && !ether_aton_r(optarg, &cfg->saddr))
-				usage(argv[0], 1);
+			if (cfg->rand_saddr) {
+				if (ether_aton_r(optarg, &cfg->saddr))
+					seed_mac(cfg->saddr.ether_addr_octet);
+				else
+					usage(argv[0], 1);
+			}
 			break;
 		case 'v':
 			cfg->verbose++;
@@ -187,23 +194,8 @@ int main(int argc, char *argv[])
 		return 1;
 
 	memcpy(&cfg.desc->frame, &template, sizeof(template));
-
-	if (cfg.rand_daddr) {
-		uint32_t ns;
-		clock_gettime(CLOCK_MONOTONIC, &last);
-		ns = last.tv_nsec;
-		memcpy(cfg.desc->frame.ether.ether_dhost, &ns, sizeof(ns));
-	} else
-		memcpy(cfg.desc->frame.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
-
-	if (cfg.rand_saddr) {
-		uint32_t ns;
-		clock_gettime(CLOCK_MONOTONIC, &last);
-		ns = last.tv_nsec;
-		memcpy(cfg.desc->frame.ether.ether_shost, &ns, sizeof(ns));
-	} else
-		memcpy(cfg.desc->frame.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
-
+	memcpy(cfg.desc->frame.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
+	memcpy(cfg.desc->frame.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
 	memcpy(cfg.desc->frame.data, dns, sizeof(dns));
 
 	if (cfg.verbose) {
