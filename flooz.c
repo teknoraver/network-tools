@@ -29,7 +29,9 @@
 #define c_buffer_sz 4096
 #define c_buffer_nb 1
 
-static const char prog[] = { '|', '/', '-', '\\' };
+const char * const help_msg = "usage: %s [-v[v]] [-i interval[u|m|s]] [-c count[k|m|g]] [-s sendermac|rand] [-d destmac|rand] iface\n";
+
+static const char prog[] = "|/-\\";
 
 struct cfg {
 	unsigned interval;
@@ -86,13 +88,6 @@ static struct frame template = {
 		.check = __constant_htons(0xc1fc),
 	},
 };
-
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
-{
-	fprintf(stderr, "usage: %s [-v[v]] [-i interval[u|m|s]] [-c count[k|m|g]] [-s sendermac|rand] [-d destmac|rand] iface\n",
-		argv0);
-	exit(ret);
-}
 
 static int setup(int argc, char *argv[], struct cfg *cfg)
 {
@@ -151,6 +146,8 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 
 	if (optind != argc - 1)
 		usage(argv[0], 1);
+
+	cfg->ifname = argv[optind];
 
 	cfg->sock = boundsock(cfg->ifname, 0);
 	if (cfg->sock == -1)

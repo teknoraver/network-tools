@@ -26,6 +26,8 @@
 
 #include "common.h"
 
+const char * const help_msg = "usage: %s [-v] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n";
+
 struct cfg {
 	int sockout;
 	int sockin;
@@ -52,13 +54,6 @@ struct __attribute__ ((packed)) frame {
 	uint64_t magic;
 	struct timespec ts;
 };
-
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
-{
-	fprintf(stderr, "usage: %s [-v] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n",
-		argv0);
-	exit(ret);
-}
 
 static int setup(int argc, char *argv[], struct cfg *cfg)
 {

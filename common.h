@@ -64,4 +64,12 @@ static int boundsock(char *ifname, uint16_t ether_type)
 	return sock;
 }
 
+extern const char * const help_msg;
+
+static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+{
+	fprintf(stderr, help_msg, argv0);
+	exit(ret);
+}
+
 #endif
