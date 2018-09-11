@@ -51,6 +51,7 @@ static int boundsock(char *ifname, uint16_t ether_type)
 {
 	struct sockaddr_ll ll = {
 		.sll_family = AF_PACKET,
+		.sll_protocol = __constant_htons(ether_type),
 	};
 	struct ifreq ifr = { 0 };
 	int sock;
