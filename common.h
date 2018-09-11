@@ -1,0 +1,67 @@
+
+#ifndef _COMMON_H
+#define _COMMON_H
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <asm/byteorder.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <linux/if.h>
+#include <linux/if_packet.h>
+
+#define ipv4_addr(o1, o2, o3, o4) __constant_htonl( \
+	(o1) << 24 | \
+	(o2) << 16 | \
+	(o3) <<  8 | \
+	(o4))
+
+static void rand_mac(unsigned char *mac)
+{
+	nrand48((unsigned short *)mac);
+	mac[0] &= 0xfe;
+}
+
+static unsigned interval(struct timespec *since, struct timespec *to)
+{
+	if (to->tv_sec == since->tv_sec)
+		return to->tv_nsec - since->tv_nsec;
+
+	return (to->tv_sec - since->tv_sec) * 1000000000
+		+ to->tv_nsec - since->tv_nsec;
+}
+
+static int boundsock(char *ifname, uint16_t ether_type)
+{
+	struct sockaddr_ll ll = {
+		.sll_family = AF_PACKET,
+	};
+	struct ifreq ifr = { 0 };
+	int sock;
+
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
+
+	sock = socket(AF_PACKET, SOCK_RAW, __constant_htons(ether_type));
+	if (sock == -1) {
+		perror("socket");
+		return -1;
+	}
+
+	if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+		perror("SIOCGIFINDEX");
+		return -1;
+	}
+	ll.sll_ifindex = ifr.ifr_ifindex;
+
+	if (bind(sock, (struct sockaddr *)&ll, sizeof(ll)) < 0) {
+		perror("bind");
+		return -1;
+	}
+
+	return sock;
+}
+
+#endif
