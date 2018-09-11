@@ -63,12 +63,14 @@ static int boundsock(char *ifname, uint16_t ether_type)
 	}
 
 	if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
+		close(sock);
 		perror("SIOCGIFINDEX");
 		return -1;
 	}
 	ll.sll_ifindex = ifr.ifr_ifindex;
 
 	if (bind(sock, (struct sockaddr *)&ll, sizeof(ll)) < 0) {
+		close(sock);
 		perror("bind");
 		return -1;
 	}
