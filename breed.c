@@ -57,6 +57,7 @@ struct __attribute__ ((packed)) frame {
 static int setup(int argc, char *argv[], struct cfg *cfg)
 {
 	int c;
+	int enable = 1;
 
 	while ((c = getopt(argc, argv, "hi:c:s:d:v")) != -1)
 		switch (c) {
@@ -118,6 +119,11 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 	cfg->sockout = boundsock(cfg->ifout, 0);
 	if (cfg->sockout == -1)
 		return 1;
+
+	if (setsockopt(cfg->sockout, SOL_PACKET, PACKET_QDISC_BYPASS, (char *)&enable, sizeof(enable)) < 0) {
+		perror("setsockopt(PACKET_QDISC_BYPASS)");
+		return 1;
+	}
 
 	cfg->sockin = boundsock(cfg->ifin, ETHERTYPE_IP);
 	if (cfg->sockin == -1)

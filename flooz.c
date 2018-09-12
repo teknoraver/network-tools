@@ -164,12 +164,17 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 		return 1;
 	}
 
+	if (setsockopt(cfg->sock, SOL_PACKET, PACKET_QDISC_BYPASS, (char *)&enable, sizeof(enable)) < 0) {
+		perror("setsockopt(PACKET_QDISC_BYPASS)");
+		return 1;
+	}
+
 	if (setsockopt(cfg->sock, SOL_PACKET, PACKET_TX_RING, (char *)&treq, sizeof(treq)) < 0) {
 		perror("setsockopt(PACKET_TX_RING)");
 		return 1;
 	}
 
-	cfg->desc = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, cfg->sock, 0);
+	cfg->desc = mmap(0, size, PROT_WRITE, MAP_SHARED | MAP_LOCKED, cfg->sock, 0);
 	if (cfg->desc == (void *)-1) {
 		perror("mmap");
 		return 1;
