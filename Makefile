@@ -1,13 +1,10 @@
-TOOLS := breed flooz
 
-CFLAGS := -pipe -O2 -Wall
+TOOLS := breed flooz
+CFLAGS = -pipe -O2 -Wall $(if $(filter breed,$@),-pthread)
 
 all: $(TOOLS)
 
 $(TOOLS): common.h
-
-breed: breed.c
-	$(CC) $(CFLAGS) -pthread $^ -o $@
 
 clean::
 	rm -f $(TOOLS)
