@@ -211,7 +211,9 @@ int main(int argc, char *argv[])
 	};
 	pthread_t th;
 
-	setup(argc, argv, &cfg);
+	if (setup(argc, argv, &cfg))
+		return 1;
+
 	memcpy(template.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
 	memcpy(template.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
 	pthread_create(&th, NULL, eed_calc, &cfg);
