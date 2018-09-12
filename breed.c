@@ -146,6 +146,11 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 	if (cfg->sockin == -1)
 		return 1;
 
+	if (setsockopt(cfg->sockin, SOL_SOCKET, SO_TIMESTAMPNS, (char *)&enable, sizeof(enable)) < 0) {
+		perror("setsockopt(SO_TIMESTAMPNS)");
+		return 1;
+	}
+
 	sched();
 
 	return 0;
@@ -193,29 +198,47 @@ static void result(struct cfg *cfg)
 static void* eed_calc(void *ptr)
 {
 	struct cfg *cfg = ptr;
-	struct timespec rxts;
 	struct frame rx;
 	unsigned eed;
+	struct iovec msg_iov = {
+		.iov_base = &rx,
+		.iov_len = sizeof(rx),
+	};
+	char ctrl[CMSG_SPACE(sizeof(struct timespec))];
+	struct cmsghdr *msg_control = (struct cmsghdr *)ctrl;
+	struct cmsghdr *cmsg;
 
-	while (1)
-		if (recv(cfg->sockin, &rx, sizeof(template), 0) == sizeof(template) &&
-		    rx.magic == __constant_cpu_to_be64(0x5274742043616C63)) {
-			clock_gettime(CLOCK_MONOTONIC, &rxts);
-			eed = interval(&rx.ts, &rxts);
+	while (1) {
+		struct msghdr msg = {
+			.msg_iov = &msg_iov,
+			.msg_iovlen = 1,
+			.msg_control = msg_control,
+			.msg_controllen = sizeof(ctrl),
+		};
 
-			if (eed < cfg->min)
-				cfg->min = eed;
+		if (recvmsg(cfg->sockin, &msg, 0) == sizeof(template) && rx.magic == template.magic) {
+			for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+				if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_TIMESTAMPNS) {
+					struct timespec *rxts = (struct timespec *)CMSG_DATA(cmsg);
 
-			if (eed > cfg->max)
-				cfg->max = eed;
+					eed = interval(&rx.ts, rxts);
 
-			cfg->sum += eed;
+					if (eed < cfg->min)
+						cfg->min = eed;
 
-			if (cfg->verbose)
-				printf("eed: %u us\n", eed / 1000);
+					if (eed > cfg->max)
+						cfg->max = eed;
 
-			cfg->rx++;
+					cfg->sum += eed;
+
+					if (cfg->verbose)
+						printf("eed: %u us\n", eed / 1000);
+
+					cfg->rx++;
+				}
+			}
 		}
+	}
 
 	return NULL;
 }
@@ -243,7 +266,7 @@ int main(int argc, char *argv[])
 		if (cfg.rand_saddr)
 			rand_mac(template.ether.ether_shost);
 
-		clock_gettime(CLOCK_MONOTONIC, &template.ts);
+		clock_gettime(CLOCK_REALTIME, &template.ts);
 		send(cfg.sockout, &template, sizeof(template), 0);
 
 		usleep(cfg.interval);
