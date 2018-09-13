@@ -1,5 +1,5 @@
 /*
- * breed.c - bridge end-to-end delay
+ * weed.c - watch end-to-end delay
  * Copyright (C) 2018 Matteo Croce <mcroce@redhat.com>
  *
  * This program is free software: you can redistribute it and/or modify

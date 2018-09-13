@@ -1,6 +1,6 @@
 
-TOOLS := breed flooz
-CFLAGS = -pipe -O2 -Wall $(if $(filter breed,$@),-pthread)
+TOOLS := weed flooz
+CFLAGS = -pipe -O2 -Wall $(if $(filter weed,$@),-pthread)
 
 all: $(TOOLS)
 
