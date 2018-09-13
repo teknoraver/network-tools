@@ -172,10 +172,10 @@ static void result(struct cfg *cfg)
 		cfg->rx,
 		cfg->sent ? (cfg->sent - cfg->rx) * 100 / cfg->sent : 100);
 	if (cfg->rx)
-		printf("eed min/avg/max = %u/%u/%u us\n",
-			cfg->min / 1000,
-			(unsigned)(cfg->sum / (cfg->rx * 1000)),
-			cfg->max / 1000);
+		printf("eed min/avg/max = %u/%u/%u ns\n",
+			cfg->min,
+			(unsigned)(cfg->sum / (cfg->rx)),
+			cfg->max);
 }
 
 static void* eed_calc(void *ptr)
@@ -215,7 +215,7 @@ static void* eed_calc(void *ptr)
 					cfg->sum += eed;
 
 					if (cfg->verbose)
-						printf("eed: %u us\n", eed / 1000);
+						printf("eed: %u ns\n", eed);
 
 					cfg->rx++;
 				}
