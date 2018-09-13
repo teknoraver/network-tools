@@ -180,6 +180,8 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 		return 1;
 	}
 
+	sched();
+
 	return 0;
 }
 

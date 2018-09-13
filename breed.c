@@ -22,8 +22,6 @@
 #include <netinet/ether.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
-#include <sched.h>
-#include <sys/resource.h>
 
 #include "common.h"
 
@@ -55,21 +53,6 @@ struct __attribute__ ((packed)) frame {
 	uint64_t magic;
 	struct timespec ts;
 };
-
-static void sched(void)
-{
-	struct sched_param param = {
-		.sched_priority = sched_get_priority_max(SCHED_FIFO),
-	};
-
-	if (param.sched_priority == -1)
-		perror("sched_get_priority_max(SCHED_FIFO)");
-	else if (sched_setscheduler(0, SCHED_FIFO, &param) == -1)
-		perror("sched_setscheduler(SCHED_FIFO)");
-
-	if (setpriority(PRIO_PROCESS, 0, -19) == -1)
-		perror("sched_priority(PRIO_PROCESS)");
-}
 
 static int setup(int argc, char *argv[], struct cfg *cfg)
 {

@@ -14,12 +14,22 @@
 #include <linux/if.h>
 #include <linux/if_packet.h>
 #include <netinet/if_ether.h>
+#include <sched.h>
+#include <sys/resource.h>
 
 #define ipv4_addr(o1, o2, o3, o4) __constant_htonl( \
 	(o1) << 24 | \
 	(o2) << 16 | \
 	(o3) <<  8 | \
 	(o4))
+
+extern const char * const help_msg;
+
+static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+{
+	fprintf(stderr, help_msg, argv0);
+	exit(ret);
+}
 
 static void rand_mac(unsigned char *mac)
 {
@@ -80,12 +90,19 @@ static int boundsock(char *ifname, uint16_t ether_type)
 	return sock;
 }
 
-extern const char * const help_msg;
-
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+static void sched(void)
 {
-	fprintf(stderr, help_msg, argv0);
-	exit(ret);
+	struct sched_param param = {
+		.sched_priority = sched_get_priority_max(SCHED_FIFO),
+	};
+
+	if (param.sched_priority == -1)
+		perror("sched_get_priority_max(SCHED_FIFO)");
+	else if (sched_setscheduler(0, SCHED_FIFO, &param) == -1)
+		perror("sched_setscheduler(SCHED_FIFO)");
+
+	if (setpriority(PRIO_PROCESS, 0, -19) == -1)
+		perror("sched_priority(PRIO_PROCESS)");
 }
 
 #endif
