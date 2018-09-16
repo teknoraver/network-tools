@@ -63,7 +63,7 @@ static int boundsock(char *ifname, uint16_t ether_type)
 		.sll_family = AF_PACKET,
 		.sll_protocol = __constant_htons(ether_type),
 	};
-	struct ifreq ifr = { 0 };
+	struct ifreq ifr = { .ifr_ifindex = 0 };
 	int sock;
 
 	strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
