@@ -254,6 +254,12 @@ int main(int argc, char *argv[])
 
 		usleep(cfg.interval);
 	}
+	if (cfg.rx < cfg.count)
+		sleep(1);
+
+	pthread_cancel(th);
+	pthread_join(th, NULL);
+
 	result(&cfg);
 
 	return 0;
