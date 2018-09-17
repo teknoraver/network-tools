@@ -31,6 +31,49 @@ static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 	exit(ret);
 }
 
+/**
+ * converts a duration specifier into useconds:
+ * 1s => 1 second => 1.000.000 usecs
+ * 1m => 1 millisecond => 1.000 usecs
+ * 1 => 1 usec
+ */
+static long timetoi(char *s)
+{
+	long ret = atol(s);
+	if (ret)
+		switch (s[strlen(s) - 1]) {
+		case 's':
+			ret *= 1000;
+		case 'm':
+			ret *= 1000;
+		}
+
+	return ret;
+}
+
+/**
+ * converts an SI specifier into bytes:
+ * 1 => 1 byte
+ * 1k => 1 kB => 1.000 bytes
+ * 1m => 1 MB => 1.000.000 bytes
+ * 1g => 1 GB => 1.000.000.000 bytes
+ */
+static long atosi(char *s)
+{
+	long ret = atol(s);
+	if (ret)
+		switch (s[strlen(s) - 1]) {
+		case 'g':
+			ret *= 1000;
+		case 'm':
+			ret *= 1000;
+		case 'k':
+			ret *= 1000;
+		}
+
+	return ret;
+}
+
 static void rand_mac(unsigned char *mac)
 {
 	nrand48((unsigned short *)mac);

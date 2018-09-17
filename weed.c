@@ -64,26 +64,10 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 		case 'h':
 			usage(argv[0], 0);
 		case 'i':
-			cfg->interval = atoi(optarg);
-			if (cfg->interval)
-				switch (optarg[strlen(optarg) - 1]) {
-				case 's':
-					cfg->interval *= 1000;
-				case 'm':
-					cfg->interval *= 1000;
-				}
+			cfg->interval = timetoi(optarg);
 			break;
 		case 'c':
-			cfg->count = atol(optarg);
-			if (cfg->count)
-				switch (optarg[strlen(optarg) - 1]) {
-				case 'g':
-					cfg->count *= 1000;
-				case 'm':
-					cfg->count *= 1000;
-				case 'k':
-					cfg->count *= 1000;
-				}
+			cfg->count = atosi(optarg);
 			break;
 		case 'd':
 			cfg->rand_daddr = !strcmp(optarg, "rand");
