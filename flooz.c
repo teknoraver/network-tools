@@ -31,6 +31,9 @@ const char * const help_msg = "usage: %s [-v[v]] [-i interval[u|m|s]] [-c count[
 
 static const char prog[] = "|/-\\";
 
+/**
+ * in memory data structure for configuration
+ */
 struct cfg {
 	unsigned interval;
 	int verbose;
@@ -44,6 +47,9 @@ struct cfg {
 	struct ether_addr saddr;
 };
 
+/**
+ * structure which represents a packet
+ */
 struct __attribute__ ((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
@@ -51,6 +57,9 @@ struct __attribute__ ((packed)) frame {
 	uint8_t data[0];
 };
 
+/**
+ * descriptor for zero copy send
+ */
 struct desc {
 	volatile struct tpacket_hdr thdr;
 	struct frame __attribute__ ((aligned(TPACKET_ALIGNMENT))) frame;
@@ -87,6 +96,9 @@ static struct frame template = {
 	},
 };
 
+/**
+ * parse cmdline and create in memory configuration
+ */
 static int setup(int argc, char *argv[], struct cfg *cfg)
 {
 	int enable = 1;

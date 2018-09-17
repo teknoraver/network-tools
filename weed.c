@@ -27,6 +27,9 @@
 
 const char * const help_msg = "usage: %s [-v] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n";
 
+/**
+ * in memory data structure for configuration
+ */
 struct cfg {
 	int sockout;
 	int sockin;
@@ -46,6 +49,9 @@ struct cfg {
 	struct ether_addr saddr;
 };
 
+/**
+ * structure which represents a probe packet
+ */
 struct __attribute__ ((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
@@ -54,6 +60,9 @@ struct __attribute__ ((packed)) frame {
 	struct timespec ts;
 };
 
+/**
+ * parse cmdline and create in memory configuration
+ */
 static int setup(int argc, char *argv[], struct cfg *cfg)
 {
 	int c;
@@ -162,6 +171,9 @@ static void result(struct cfg *cfg)
 			cfg->max);
 }
 
+/**
+ * calculate the eed of incoming packets
+ */
 static void* eed_calc(void *ptr)
 {
 	struct cfg *cfg = ptr;

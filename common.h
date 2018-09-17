@@ -25,6 +25,10 @@
 
 extern const char * const help_msg;
 
+/**
+ * utility function to print a message and exit
+ * help_msg is the extern char * which will be printed
+ */
 static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 {
 	fprintf(stderr, help_msg, argv0);
@@ -74,12 +78,19 @@ static long atosi(char *s)
 	return ret;
 }
 
+/**
+ * fills the buffer with 6 pseudo random octects
+ */
 static void rand_mac(unsigned char *mac)
 {
 	nrand48((unsigned short *)mac);
 	mac[0] &= 0xfe;
 }
 
+/**
+ * seeds nrand48 with the current time, and fills
+ * the buffer with 6 pseudo random octects
+ */
 static void seed_mac(unsigned char *mac)
 {
 	struct timespec now = { 0 };
@@ -91,6 +102,9 @@ static void seed_mac(unsigned char *mac)
 	rand_mac(mac);
 }
 
+/**
+ * subtracts two struct timespec
+ */
 static unsigned interval(struct timespec *since, struct timespec *to)
 {
 	if (to->tv_sec == since->tv_sec)
@@ -100,6 +114,10 @@ static unsigned interval(struct timespec *since, struct timespec *to)
 		+ to->tv_nsec - since->tv_nsec;
 }
 
+/**
+ * creates an AF_PACKET socket bound to an interface with a specific ether_type.
+ * Set ether_type to disable rx
+ */
 static int boundsock(char *ifname, uint16_t ether_type)
 {
 	struct sockaddr_ll ll = {
@@ -133,6 +151,9 @@ static int boundsock(char *ifname, uint16_t ether_type)
 	return sock;
 }
 
+/**
+ * set the current thread to maximum priority and FIFO scheduler
+ */
 static void sched(void)
 {
 	struct sched_param param = {
