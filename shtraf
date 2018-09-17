@@ -1,15 +1,21 @@
 #!/bin/sh
 
-dev=$1
+[ $# -eq 1 ] || exec echo "usage: $0 <interface>"
+[ -d "/sys/class/net/$1" ] || exec echo "$1: no such interface"
 
+get_stats() {
+	rx=$newrx
+	tx=$newtx
+	rxp=$newrxp
+	txp=$newtxp
+	read newrx <"/sys/class/net/$1/statistics/rx_bytes"
+	read newtx <"/sys/class/net/$1/statistics/tx_bytes"
+	read newrxp <"/sys/class/net/$1/statistics/rx_packets"
+	read newtxp <"/sys/class/net/$1/statistics/tx_packets"
+}
+
+get_stats "$1"
 while sleep 1 ; do
-        read newrx </sys/class/net/$dev/statistics/rx_bytes
-        read newtx </sys/class/net/$dev/statistics/tx_bytes
-        read newrxp </sys/class/net/$dev/statistics/rx_packets
-        read newtxp </sys/class/net/$dev/statistics/tx_packets
-        [ -n "$rx" ] && printf 'rx: %.2f Mbps %.1f kpps tx: %.2f Mpps %.1f kpps\n' $(((newrx-rx) / 125000)) $(((newrxp-rxp) / 1000)) $(((newtx-tx) / 125000)) $(((newtxp-txp) / 1000))
-        rx=$newrx
-        tx=$newtx
-        rxp=$newrxp
-        txp=$newtxp
+	get_stats "$1"
+	printf 'rx: %u Mbps %u kpps tx: %u Mpps %u kpps\n' $(((newrx-rx) / 125000)) $(((newrxp-rxp) / 1000)) $(((newtx-tx) / 125000)) $(((newtxp-txp) / 1000))
 done
