@@ -259,7 +259,7 @@ static void* eed_calc(void *ptr)
 					cfg->sum2 += eed * eed;
 
 					if (cfg->verbose)
-						printf("eed: %u ns\n", eed);
+						printf("eed: %.1f us\n", (float)eed / 1000);
 
 					cfg->rx++;
 				}
