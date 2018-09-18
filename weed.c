@@ -38,8 +38,8 @@ struct cfg {
 	char *ifin;
 	unsigned interval;
 	unsigned count;
-	unsigned long sum;
-	unsigned long sum2;
+	unsigned long long sum;
+	unsigned long long sum2;
 	unsigned rx;
 	unsigned sent;
 	unsigned min;
@@ -225,7 +225,7 @@ static void* eed_calc(void *ptr)
 {
 	struct cfg *cfg = ptr;
 	struct frame rx;
-	unsigned eed;
+	unsigned long long eed;
 	struct iovec msg_iov = {
 		.iov_base = &rx,
 		.iov_len = sizeof(rx),
