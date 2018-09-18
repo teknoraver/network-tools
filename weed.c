@@ -38,6 +38,7 @@ struct cfg {
 	unsigned interval;
 	unsigned count;
 	unsigned long sum;
+	unsigned long sum2;
 	unsigned rx;
 	unsigned sent;
 	unsigned min;
@@ -158,17 +159,39 @@ static struct frame template = {
 	.magic = __constant_cpu_to_be64(0x5274742043616C63),
 };
 
+/**
+ * integer sqrt calculation through iteration
+ */
+static long llsqrt(unsigned long long a)
+{
+	unsigned long long prev = ULLONG_MAX;
+	unsigned long long x = a;
+
+	if (!x)
+		return 0;
+
+	while (x < prev) {
+		prev = x;
+		x = (x + a / x) / 2;
+	}
+
+	return (long)x;
+}
+
 static void result(struct cfg *cfg)
 {
 	printf("%u packets transmitted, %u received, %u%% packet loss\n",
 		cfg->sent,
 		cfg->rx,
 		cfg->sent ? (cfg->sent - cfg->rx) * 100 / cfg->sent : 100);
-	if (cfg->rx)
-		printf("eed min/avg/max = %u/%u/%u ns\n",
-			cfg->min,
-			(unsigned)(cfg->sum / (cfg->rx)),
-			cfg->max);
+	if (cfg->rx) {
+		cfg->sum /= cfg->rx;
+		cfg->sum2 /= cfg->rx;
+		printf("eed min/avg/max/mdev = %u/%u/%u/%u ns\n",
+			cfg->min, (unsigned)cfg->sum, cfg->max,
+			(unsigned)llsqrt(cfg->sum2 - cfg->sum * cfg->sum)
+		);
+	}
 }
 
 /**
@@ -209,6 +232,7 @@ static void* eed_calc(void *ptr)
 						cfg->max = eed;
 
 					cfg->sum += eed;
+					cfg->sum2 += eed * eed;
 
 					if (cfg->verbose)
 						printf("eed: %u ns\n", eed);
