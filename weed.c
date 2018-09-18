@@ -162,7 +162,7 @@ static struct frame template = {
 /**
  * integer sqrt calculation through iteration
  */
-static long llsqrt(unsigned long long a)
+static unsigned long llsqrt(unsigned long long a)
 {
 	unsigned long long prev = ULLONG_MAX;
 	unsigned long long x = a;
@@ -175,9 +175,12 @@ static long llsqrt(unsigned long long a)
 		x = (x + a / x) / 2;
 	}
 
-	return (long)x;
+	return (unsigned long)x;
 }
 
+/**
+ * gather statistics and prints them
+ */
 static void result(struct cfg *cfg)
 {
 	printf("%u packets transmitted, %u received, %u%% packet loss\n",
@@ -187,9 +190,11 @@ static void result(struct cfg *cfg)
 	if (cfg->rx) {
 		cfg->sum /= cfg->rx;
 		cfg->sum2 /= cfg->rx;
-		printf("eed min/avg/max/mdev = %u/%u/%u/%u ns\n",
-			cfg->min, (unsigned)cfg->sum, cfg->max,
-			(unsigned)llsqrt(cfg->sum2 - cfg->sum * cfg->sum)
+		printf("eed min/avg/max/mdev = %.1f/%.1f/%.1f/%.1f us\n",
+			(float)cfg->min / 1000,
+			(float)cfg->sum / 1000,
+			(float)cfg->max / 1000,
+			(float)llsqrt(cfg->sum2 - cfg->sum * cfg->sum) / 1000
 		);
 	}
 }
