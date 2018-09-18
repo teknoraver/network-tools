@@ -17,6 +17,7 @@
  */
 
 #include <limits.h>
+#include <signal.h>
 #include <pthread.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
@@ -48,6 +49,14 @@ struct cfg {
 	int rand_saddr;
 	struct ether_addr daddr;
 	struct ether_addr saddr;
+	pthread_t th;
+};
+
+static struct cfg cfg = {
+	.interval = 1000000,
+	.min = UINT_MAX,
+	.rand_daddr = 1,
+	.rand_saddr = 1,
 };
 
 /**
@@ -61,6 +70,76 @@ struct __attribute__ ((packed)) frame {
 	struct timespec ts;
 };
 
+static struct frame template = {
+	.ether = {
+		.ether_type = __constant_htons(ETHERTYPE_IP),
+	},
+	.ip = {
+		.version = 4,
+		.ihl = 5,
+		.tot_len = __constant_htons(sizeof(template.ip) + sizeof(template.udp) + sizeof(template.magic) + sizeof(template.ts)),
+		.id = __constant_htons(0xcda3),
+		.frag_off = 0x40,
+		.ttl = 64,
+		.protocol = IPPROTO_UDPLITE,
+		.check = __constant_htons(0x414a),
+		.saddr = ipv4_addr(192, 168, 85, 2),
+		.daddr = ipv4_addr(192, 168, 85, 1),
+	},
+	.udp = {
+		.source = __constant_htons(7),
+		.dest = __constant_htons(7),
+		/* no checksum */
+		.len = __constant_htons(8),
+		.check = __constant_htons(0xd47b),
+	},
+	.magic = __constant_cpu_to_be64(0x5274742043616C63),
+};
+
+/**
+ * integer sqrt calculation through iteration
+ */
+static unsigned long llsqrt(unsigned long long a)
+{
+	unsigned long long prev = ULLONG_MAX;
+	unsigned long long x = a;
+
+	if (!x)
+		return 0;
+
+	while (x < prev) {
+		prev = x;
+		x = (x + a / x) / 2;
+	}
+
+	return (unsigned long)x;
+}
+
+/**
+ * gather statistics and prints them
+ */
+static void result(int sig)
+{
+	pthread_cancel(cfg.th);
+	pthread_join(cfg.th, NULL);
+
+	printf("%u packets transmitted, %u received, %u%% packet loss\n",
+		cfg.sent,
+		cfg.rx,
+		cfg.sent ? (cfg.sent - cfg.rx) * 100 / cfg.sent : 100);
+	if (cfg.rx) {
+		cfg.sum /= cfg.rx;
+		cfg.sum2 /= cfg.rx;
+		printf("eed min/avg/max/mdev = %.1f/%.1f/%.1f/%.1f us\n",
+			(float)cfg.min / 1000,
+			(float)cfg.sum / 1000,
+			(float)cfg.max / 1000,
+			(float)llsqrt(cfg.sum2 - cfg.sum * cfg.sum) / 1000
+		);
+	}
+	exit(0);
+}
+
 /**
  * parse cmdline and create in memory configuration
  */
@@ -68,6 +147,10 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 {
 	int c;
 	int enable = 1;
+	struct sigaction sa = {
+		.sa_handler = result,
+		.sa_flags = SA_RESTART,
+	};
 
 	while ((c = getopt(argc, argv, "hi:c:s:d:v")) != -1)
 		switch (c) {
@@ -130,73 +213,9 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 
 	sched();
 
+	sigaction(SIGINT, &sa, NULL);
+
 	return 0;
-}
-
-static struct frame template = {
-	.ether = {
-		.ether_type = __constant_htons(ETHERTYPE_IP),
-	},
-	.ip = {
-		.version = 4,
-		.ihl = 5,
-		.tot_len = __constant_htons(sizeof(template.ip) + sizeof(template.udp) + sizeof(template.magic) + sizeof(template.ts)),
-		.id = __constant_htons(0xcda3),
-		.frag_off = 0x40,
-		.ttl = 64,
-		.protocol = IPPROTO_UDPLITE,
-		.check = __constant_htons(0x414a),
-		.saddr = ipv4_addr(192, 168, 85, 2),
-		.daddr = ipv4_addr(192, 168, 85, 1),
-	},
-	.udp = {
-		.source = __constant_htons(7),
-		.dest = __constant_htons(7),
-		/* no checksum */
-		.len = __constant_htons(8),
-		.check = __constant_htons(0xd47b),
-	},
-	.magic = __constant_cpu_to_be64(0x5274742043616C63),
-};
-
-/**
- * integer sqrt calculation through iteration
- */
-static unsigned long llsqrt(unsigned long long a)
-{
-	unsigned long long prev = ULLONG_MAX;
-	unsigned long long x = a;
-
-	if (!x)
-		return 0;
-
-	while (x < prev) {
-		prev = x;
-		x = (x + a / x) / 2;
-	}
-
-	return (unsigned long)x;
-}
-
-/**
- * gather statistics and prints them
- */
-static void result(struct cfg *cfg)
-{
-	printf("%u packets transmitted, %u received, %u%% packet loss\n",
-		cfg->sent,
-		cfg->rx,
-		cfg->sent ? (cfg->sent - cfg->rx) * 100 / cfg->sent : 100);
-	if (cfg->rx) {
-		cfg->sum /= cfg->rx;
-		cfg->sum2 /= cfg->rx;
-		printf("eed min/avg/max/mdev = %.1f/%.1f/%.1f/%.1f us\n",
-			(float)cfg->min / 1000,
-			(float)cfg->sum / 1000,
-			(float)cfg->max / 1000,
-			(float)llsqrt(cfg->sum2 - cfg->sum * cfg->sum) / 1000
-		);
-	}
 }
 
 /**
@@ -253,20 +272,12 @@ static void* eed_calc(void *ptr)
 
 int main(int argc, char *argv[])
 {
-	struct cfg cfg = {
-		.interval = 1000000,
-		.min = UINT_MAX,
-		.rand_daddr = 1,
-		.rand_saddr = 1,
-	};
-	pthread_t th;
-
 	if (setup(argc, argv, &cfg))
 		return 1;
 
 	memcpy(template.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
 	memcpy(template.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
-	pthread_create(&th, NULL, eed_calc, &cfg);
+	pthread_create(&cfg.th, NULL, eed_calc, &cfg);
 
 	for (; !cfg.count || cfg.sent < cfg.count; cfg.sent++) {
 		if (cfg.rand_daddr)
@@ -282,10 +293,7 @@ int main(int argc, char *argv[])
 	if (cfg.rx < cfg.count)
 		sleep(1);
 
-	pthread_cancel(th);
-	pthread_join(th, NULL);
-
-	result(&cfg);
+	result(0);
 
 	return 0;
 }
