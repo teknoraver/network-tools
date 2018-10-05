@@ -7,4 +7,4 @@ all: $(TOOLS)
 $(TOOLS): common.h
 
 clean::
-	rm -f $(TOOLS)
+	$(RM) $(TOOLS)
