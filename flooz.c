@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <errno.h>
 #include <sys/mman.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
@@ -218,8 +219,10 @@ int main(int argc, char *argv[])
 		cfg.desc->thdr.tp_len = sizeof(template) + sizeof(dns);
 		cfg.desc->thdr.tp_status = TP_STATUS_SEND_REQUEST;
 		ret = send(cfg.sock, NULL, 0, 0);
-		if (ret == -1)
+		if (ret == -1 && errno != ENOBUFS) {
+			perror("send");
 			break;
+		}
 		sent++;
 
 		if (cfg.interval)
