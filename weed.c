@@ -164,21 +164,17 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 			break;
 		case 'd':
 			cfg->rand_daddr = !strcmp(optarg, "rand");
-			if (cfg->rand_daddr) {
-				if (ether_aton_r(optarg, &cfg->daddr))
-					seed_mac(cfg->daddr.ether_addr_octet);
-				else
+			if (cfg->rand_daddr)
+				seed_mac(cfg->daddr.ether_addr_octet);
+			else if (!ether_aton_r(optarg, &cfg->daddr))
 					usage(argv[0], 1);
-			}
 			break;
 		case 's':
 			cfg->rand_saddr = !strcmp(optarg, "rand");
-			if (cfg->rand_saddr) {
-				if (ether_aton_r(optarg, &cfg->saddr))
-					seed_mac(cfg->saddr.ether_addr_octet);
-				else
+			if (cfg->rand_saddr)
+				seed_mac(cfg->saddr.ether_addr_octet);
+			else if (!ether_aton_r(optarg, &cfg->saddr))
 					usage(argv[0], 1);
-			}
 			break;
 		case 'v':
 			cfg->verbose = 1;
