@@ -148,7 +148,7 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 
 	cfg->ifname = argv[optind];
 
-	cfg->sock = boundsock(cfg->ifname, 0);
+	cfg->sock = bindsock(cfg->ifname, 0);
 	if (cfg->sock == -1)
 		return 1;
 

@@ -119,7 +119,7 @@ static unsigned interval(struct timespec *since, struct timespec *to)
  * creates an AF_PACKET socket bound to an interface with a specific ether_type.
  * Set ether_type to disable rx
  */
-static int boundsock(char *ifname, uint16_t ether_type)
+static int bindsock(char *ifname, uint16_t ether_type)
 {
 	struct sockaddr_ll ll = {
 		.sll_family = AF_PACKET,

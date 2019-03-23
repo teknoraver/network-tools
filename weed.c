@@ -189,7 +189,7 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 	cfg->ifout = argv[optind];
 	cfg->ifin = argv[optind + 1];
 
-	cfg->sockout = boundsock(cfg->ifout, 0);
+	cfg->sockout = bindsock(cfg->ifout, 0);
 	if (cfg->sockout == -1)
 		return 1;
 
@@ -198,7 +198,7 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 		return 1;
 	}
 
-	cfg->sockin = boundsock(cfg->ifin, ETHERTYPE_IP);
+	cfg->sockin = bindsock(cfg->ifin, ETHERTYPE_IP);
 	if (cfg->sockin == -1)
 		return 1;
 
