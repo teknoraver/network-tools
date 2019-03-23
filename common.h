@@ -11,6 +11,7 @@
 #include <asm/byteorder.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <net/if.h>
 #include <linux/if.h>
 #include <linux/if_packet.h>
 #include <netinet/if_ether.h>
@@ -123,24 +124,20 @@ static int boundsock(char *ifname, uint16_t ether_type)
 	struct sockaddr_ll ll = {
 		.sll_family = AF_PACKET,
 		.sll_protocol = __constant_htons(ether_type),
+		.sll_ifindex = if_nametoindex(ifname),
 	};
-	struct ifreq ifr = { .ifr_ifindex = 0 };
 	int sock;
 
-	strncpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
+	if (!ll.sll_ifindex) {
+		perror("if_nametoindex");
+		return -1;
+	}
 
 	sock = socket(AF_PACKET, SOCK_RAW, __constant_htons(ether_type));
 	if (sock == -1) {
 		perror("socket");
 		return -1;
 	}
-
-	if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) {
-		close(sock);
-		perror("SIOCGIFINDEX");
-		return -1;
-	}
-	ll.sll_ifindex = ifr.ifr_ifindex;
 
 	if (bind(sock, (struct sockaddr *)&ll, sizeof(ll)) < 0) {
 		close(sock);
