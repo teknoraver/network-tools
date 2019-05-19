@@ -16,48 +16,58 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 #include <limits.h>
 #include <signal.h>
 #include <pthread.h>
+#include <asm/byteorder.h>
+#include <linux/if_packet.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <time.h>
+#include <sched.h>
+#include <sys/resource.h>
 
-#include "common.h"
+#define ipv4_addr(o1, o2, o3, o4) __constant_htonl( \
+	(o1) << 24 | \
+	(o2) << 16 | \
+	(o3) <<  8 | \
+	(o4))
 
-const char * const help_msg = "usage: %s [-v] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n";
+static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+{
+	fprintf(stderr, "usage: %s [-v] [-d dstaddr] [-s srcaddr] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n", argv0);
+	exit(ret);
+}
 
 /**
  * in memory data structure for configuration
  */
-struct cfg {
-	int sockout;
-	int sockin;
-	char *ifout;
-	char *ifin;
-	unsigned interval;
-	unsigned count;
-	unsigned long long sum;
-	unsigned long long sum2;
-	unsigned rx;
-	unsigned sent;
-	unsigned min;
-	unsigned max;
-	int verbose;
-	int rand_daddr;
-	int rand_saddr;
-	struct ether_addr daddr;
-	struct ether_addr saddr;
-	pthread_t th;
-};
-
-static struct cfg cfg = {
-	.interval = 1000000,
-	.min = UINT_MAX,
-	.rand_daddr = 1,
-	.rand_saddr = 1,
-};
+static int sockout;
+static int sockin;
+static char *ifout;
+static char *ifin;
+static unsigned interval = 1000000;
+static unsigned count;
+static unsigned long long sum;
+static unsigned long long sum2;
+static unsigned rx;
+static unsigned sent;
+static unsigned min = UINT_MAX;
+static unsigned max;
+static int verbose;
+static int rand_daddr = 1;
+static int rand_saddr = 1;
+static struct ether_addr daddr;
+static struct ether_addr saddr;
+static pthread_t th;
 
 /**
  * structure which represents a probe packet
@@ -97,6 +107,30 @@ static struct frame template = {
 };
 
 /**
+ * fills the buffer with 6 pseudo random octects
+ */
+static void rand_mac(unsigned char *mac)
+{
+	nrand48((unsigned short *)mac);
+	mac[0] &= 0xfe;
+}
+
+/**
+ * seeds nrand48 with the current time, and fills
+ * the buffer with 6 pseudo random octects
+ */
+static void seed_mac(unsigned char *mac)
+{
+	struct timespec now = { 0 };
+	uint64_t ns;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	ns = now.tv_sec * now.tv_nsec;
+	memcpy(mac, &ns, ETH_ALEN);
+	rand_mac(mac);
+}
+
+/**
  * integer sqrt calculation through iteration
  */
 static unsigned long llsqrt(unsigned long long a)
@@ -116,34 +150,140 @@ static unsigned long llsqrt(unsigned long long a)
 }
 
 /**
+ * converts a duration specifier into useconds:
+ * 1s => 1 second => 1.000.000 usecs
+ * 1m => 1 millisecond => 1.000 usecs
+ * 1 => 1 usec
+ */
+static long timetoi(char *s)
+{
+	long ret = atol(s);
+	if (ret)
+		switch (s[strlen(s) - 1]) {
+		case 's':
+			ret *= 1000;
+		case 'm':
+			ret *= 1000;
+		}
+
+	return ret;
+}
+
+/**
+ * converts an SI specifier into bytes:
+ * 1 => 1 byte
+ * 1k => 1 kB => 1.000 bytes
+ * 1m => 1 MB => 1.000.000 bytes
+ * 1g => 1 GB => 1.000.000.000 bytes
+ */
+static long atosi(char *s)
+{
+	long ret = atol(s);
+	if (ret)
+		switch (s[strlen(s) - 1]) {
+		case 'g':
+			ret *= 1000;
+		case 'm':
+			ret *= 1000;
+		case 'k':
+			ret *= 1000;
+		}
+
+	return ret;
+}
+
+/**
+ * subtracts two struct timespec
+ */
+static unsigned time_sub(struct timespec *since, struct timespec *to)
+{
+	if (to->tv_sec == since->tv_sec)
+		return to->tv_nsec - since->tv_nsec;
+
+	return (to->tv_sec - since->tv_sec) * 1000000000
+		+ to->tv_nsec - since->tv_nsec;
+}
+
+/**
  * gather statistics and prints them
  */
 static void result(int sig)
 {
-	pthread_cancel(cfg.th);
-	pthread_join(cfg.th, NULL);
+	pthread_cancel(th);
+	pthread_join(th, NULL);
 
 	printf("%u packets transmitted, %u received, %u%% packet loss\n",
-		cfg.sent,
-		cfg.rx,
-		cfg.sent ? (cfg.sent - cfg.rx) * 100 / cfg.sent : 100);
-	if (cfg.rx) {
-		cfg.sum /= cfg.rx;
-		cfg.sum2 /= cfg.rx;
+		sent,
+		rx,
+		sent ? (sent - rx) * 100 / sent : 100);
+	if (rx) {
+		sum /= rx;
+		sum2 /= rx;
 		printf("eed min/avg/max/mdev = %.1f/%.1f/%.1f/%.1f us\n",
-			(float)cfg.min / 1000,
-			(float)cfg.sum / 1000,
-			(float)cfg.max / 1000,
-			(float)llsqrt(cfg.sum2 - cfg.sum * cfg.sum) / 1000
+			(float)min / 1000,
+			(float)sum / 1000,
+			(float)max / 1000,
+			(float)llsqrt(sum2 - sum * sum) / 1000
 		);
 	}
 	exit(0);
 }
 
 /**
+ * creates an AF_PACKET socket bound to an interface with a specific ether_type.
+ * Set ether_type to disable rx
+ */
+static int bindsock(char *ifname, uint16_t ether_type)
+{
+	struct sockaddr_ll ll = {
+		.sll_family = AF_PACKET,
+		.sll_protocol = __constant_htons(ether_type),
+		.sll_ifindex = if_nametoindex(ifname),
+	};
+	int sock;
+
+	if (!ll.sll_ifindex) {
+		perror("if_nametoindex");
+		return -1;
+	}
+
+	sock = socket(AF_PACKET, SOCK_RAW, __constant_htons(ether_type));
+	if (sock == -1) {
+		perror("socket");
+		return -1;
+	}
+
+	if (bind(sock, (struct sockaddr *)&ll, sizeof(ll)) < 0) {
+		close(sock);
+		perror("bind");
+		return -1;
+	}
+
+	return sock;
+}
+
+/**
+ * set the current thread to maximum priority and FIFO scheduler
+ */
+static void sched(void)
+{
+	struct sched_param param = {
+		.sched_priority = sched_get_priority_max(SCHED_FIFO),
+	};
+
+	if (param.sched_priority == -1)
+		perror("sched_get_priority_max(SCHED_FIFO)");
+	else if (sched_setscheduler(0, SCHED_FIFO, &param) == -1)
+		perror("sched_setscheduler(SCHED_FIFO)");
+
+	if (setpriority(PRIO_PROCESS, 0, -19) == -1)
+		perror("sched_priority(PRIO_PROCESS)");
+}
+
+/**
  * parse cmdline and create in memory configuration
  */
-static int setup(int argc, char *argv[], struct cfg *cfg)
+static int setup(int argc, char *argv[])
 {
 	int c;
 	int enable = 1;
@@ -157,27 +297,27 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 		case 'h':
 			usage(argv[0], 0);
 		case 'i':
-			cfg->interval = timetoi(optarg);
+			interval = timetoi(optarg);
 			break;
 		case 'c':
-			cfg->count = atosi(optarg);
+			count = atosi(optarg);
 			break;
 		case 'd':
-			cfg->rand_daddr = !strcmp(optarg, "rand");
-			if (cfg->rand_daddr)
-				seed_mac(cfg->daddr.ether_addr_octet);
-			else if (!ether_aton_r(optarg, &cfg->daddr))
+			rand_daddr = !strcmp(optarg, "rand");
+			if (rand_daddr)
+				seed_mac(daddr.ether_addr_octet);
+			else if (!ether_aton_r(optarg, &daddr))
 					usage(argv[0], 1);
 			break;
 		case 's':
-			cfg->rand_saddr = !strcmp(optarg, "rand");
-			if (cfg->rand_saddr)
-				seed_mac(cfg->saddr.ether_addr_octet);
-			else if (!ether_aton_r(optarg, &cfg->saddr))
+			rand_saddr = !strcmp(optarg, "rand");
+			if (rand_saddr)
+				seed_mac(saddr.ether_addr_octet);
+			else if (!ether_aton_r(optarg, &saddr))
 					usage(argv[0], 1);
 			break;
 		case 'v':
-			cfg->verbose = 1;
+			verbose = 1;
 			break;
 		default:
 			usage(argv[0], 1);
@@ -186,23 +326,23 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
 	if (optind != argc - 2)
 		usage(argv[0], 1);
 
-	cfg->ifout = argv[optind];
-	cfg->ifin = argv[optind + 1];
+	ifout = argv[optind];
+	ifin = argv[optind + 1];
 
-	cfg->sockout = bindsock(cfg->ifout, 0);
-	if (cfg->sockout == -1)
+	sockout = bindsock(ifout, 0);
+	if (sockout == -1)
 		return 1;
 
-	if (setsockopt(cfg->sockout, SOL_PACKET, PACKET_QDISC_BYPASS, (char *)&enable, sizeof(enable)) < 0) {
+	if (setsockopt(sockout, SOL_PACKET, PACKET_QDISC_BYPASS, (char *)&enable, sizeof(enable)) < 0) {
 		perror("setsockopt(PACKET_QDISC_BYPASS)");
 		return 1;
 	}
 
-	cfg->sockin = bindsock(cfg->ifin, ETHERTYPE_IP);
-	if (cfg->sockin == -1)
+	sockin = bindsock(ifin, ETHERTYPE_IP);
+	if (sockin == -1)
 		return 1;
 
-	if (setsockopt(cfg->sockin, SOL_SOCKET, SO_TIMESTAMPNS, (char *)&enable, sizeof(enable)) < 0) {
+	if (setsockopt(sockin, SOL_SOCKET, SO_TIMESTAMPNS, (char *)&enable, sizeof(enable)) < 0) {
 		perror("setsockopt(SO_TIMESTAMPNS)");
 		return 1;
 	}
@@ -219,12 +359,11 @@ static int setup(int argc, char *argv[], struct cfg *cfg)
  */
 static void* eed_calc(void *ptr)
 {
-	struct cfg *cfg = ptr;
-	struct frame rx;
+	struct frame rxf;
 	unsigned long long eed;
 	struct iovec msg_iov = {
-		.iov_base = &rx,
-		.iov_len = sizeof(rx),
+		.iov_base = &rxf,
+		.iov_len = sizeof(rxf),
 	};
 	char ctrl[CMSG_SPACE(sizeof(struct timespec))];
 	struct cmsghdr *msg_control = (struct cmsghdr *)ctrl;
@@ -238,26 +377,26 @@ static void* eed_calc(void *ptr)
 			.msg_controllen = sizeof(ctrl),
 		};
 
-		if (recvmsg(cfg->sockin, &msg, 0) == sizeof(template) && rx.magic == template.magic) {
+		if (recvmsg(sockin, &msg, 0) == sizeof(template) && rxf.magic == template.magic) {
 			for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
 				if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_TIMESTAMPNS) {
 					struct timespec *rxts = (struct timespec *)CMSG_DATA(cmsg);
 
-					eed = interval(&rx.ts, rxts);
+					eed = time_sub(&rxf.ts, rxts);
 
-					if (eed < cfg->min)
-						cfg->min = eed;
+					if (eed < min)
+						min = eed;
 
-					if (eed > cfg->max)
-						cfg->max = eed;
+					if (eed > max)
+						max = eed;
 
-					cfg->sum += eed;
-					cfg->sum2 += eed * eed;
+					sum += eed;
+					sum2 += eed * eed;
 
-					if (cfg->verbose)
+					if (verbose)
 						printf("eed: %.1f us\n", (float)eed / 1000);
 
-					cfg->rx++;
+					rx++;
 				}
 			}
 		}
@@ -268,25 +407,25 @@ static void* eed_calc(void *ptr)
 
 int main(int argc, char *argv[])
 {
-	if (setup(argc, argv, &cfg))
+	if (setup(argc, argv))
 		return 1;
 
-	memcpy(template.ether.ether_dhost, cfg.daddr.ether_addr_octet, ETH_ALEN);
-	memcpy(template.ether.ether_shost, cfg.saddr.ether_addr_octet, ETH_ALEN);
-	pthread_create(&cfg.th, NULL, eed_calc, &cfg);
+	memcpy(template.ether.ether_dhost, daddr.ether_addr_octet, ETH_ALEN);
+	memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
+	pthread_create(&th, NULL, eed_calc, NULL);
 
-	for (; !cfg.count || cfg.sent < cfg.count; cfg.sent++) {
-		if (cfg.rand_daddr)
+	for (; !count || sent < count; sent++) {
+		if (rand_daddr)
 			rand_mac(template.ether.ether_dhost);
-		if (cfg.rand_saddr)
+		if (rand_saddr)
 			rand_mac(template.ether.ether_shost);
 
 		clock_gettime(CLOCK_REALTIME, &template.ts);
-		send(cfg.sockout, &template, sizeof(template), 0);
+		send(sockout, &template, sizeof(template), 0);
 
-		usleep(cfg.interval);
+		usleep(interval);
 	}
-	if (cfg.rx < cfg.count)
+	if (rx < count)
 		sleep(1);
 
 	result(0);
