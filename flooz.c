@@ -55,7 +55,6 @@ struct __attribute__ ((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
 	struct udphdr udp;
-	uint8_t data[18];
 };
 
 static struct frame template = {
@@ -65,7 +64,6 @@ static struct frame template = {
 	.ip = {
 		.version = 4,
 		.ihl = 5,
-		.tot_len = __constant_htons(sizeof(template.ip) + sizeof(template.udp) + sizeof(template.data)),
 		.id = __constant_htons(0xcda3),
 		.frag_off = 0x40,
 		.ttl = 64,
@@ -76,12 +74,6 @@ static struct frame template = {
 	.udp = {
 		.source = __constant_htons(36674),
 		.dest = __constant_htons(9),
-		.len = __constant_htons(sizeof(template.udp) + sizeof(template.data)),
-	},
-	.data = {
-		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-		0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
-		0x11, 0x12,
 	},
 };
 
@@ -99,6 +91,7 @@ static int rand_daddr = 1;
 static int rand_saddr = 1;
 static struct ether_addr daddr;
 static struct ether_addr saddr;
+static int datalen = 18;
 
 static const char *opt_if;
 static int opt_ifindex;
@@ -112,7 +105,7 @@ static uint32_t prog_id;
 
 static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 {
-	fprintf(stderr, "usage: %s [-s sendermac|rand] [-d destmac|rand] [-S srcip] [-D dstip] iface\n", argv0);
+	fprintf(stderr, "usage: %s [-s sendermac|rand] [-d destmac|rand] [-S srcip] [-D dstip] [-l len] iface\n", argv0);
 	exit(ret);
 }
 
@@ -197,10 +190,11 @@ static void seed_mac(unsigned char *mac)
 static int setup(int argc, char *argv[])
 {
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+	char payload[ETH_DATA_LEN];
 	int c, i;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:d:S:D:h")) != -1)
+	while ((c = getopt(argc, argv, "s:d:S:D:l:h")) != -1)
 		switch (c) {
 		case 'h':
 			usage(argv[0], 0);
@@ -220,6 +214,13 @@ static int setup(int argc, char *argv[])
 		case 'D':
 			template.ip.daddr = inet_addr(optarg);
 			break;
+		case 'l':
+			datalen = atoi(optarg);
+			/* 4 extra byte for FCS */
+			if (datalen + sizeof(template.ether) + 4 < 64|| datalen > ETH_DATA_LEN)
+				err("datalen must be between 46 and 1500\n");
+			datalen -= sizeof(template.ip) + sizeof(template.udp);
+			break;
 		default:
 			usage(argv[0], 1);
 		}
@@ -232,6 +233,9 @@ static int setup(int argc, char *argv[])
 	if (!opt_ifindex)
 		err("if_nametoindex(): %s\n", strerror(errno));
 
+	template.ip.tot_len = htons(datalen + sizeof(template.ip) + sizeof(template.udp));
+	template.udp.len = htons(datalen + sizeof(template.udp));
+
 	if (rand_daddr)
 		seed_mac(template.ether.ether_dhost);
 	else
@@ -242,6 +246,9 @@ static int setup(int argc, char *argv[])
 		memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
 
 	ip_checksum(&template.ip);
+
+	for (i = 0; i < datalen; i++)
+		payload[i] = i;
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r))
 		err("setrlimit(RLIMIT_MEMLOCK): %s\n", strerror(errno));
@@ -258,6 +265,7 @@ static int setup(int argc, char *argv[])
 		return 1;
 
 	for (i = 0; i < NUM_FRAMES; i++) {
+
 		if (rand_daddr)
 			rand_mac(template.ether.ether_dhost);
 
@@ -265,6 +273,7 @@ static int setup(int argc, char *argv[])
 			rand_mac(template.ether.ether_shost);
 
 		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE), &template, sizeof(template));
+		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE) + sizeof(template), payload, datalen);
 	}
 
 	return 0;
@@ -313,7 +322,7 @@ int main(int argc, char *argv[])
 
 			for (i = 0; i < BATCH_SIZE; i++) {
 				xsk_ring_prod__tx_desc(&tx, idx + i)->addr = (frame_nb + i) << XSK_UMEM__DEFAULT_FRAME_SHIFT;
-				xsk_ring_prod__tx_desc(&tx, idx + i)->len = sizeof(template);
+				xsk_ring_prod__tx_desc(&tx, idx + i)->len = sizeof(template) + datalen;
 			}
 
 			xsk_ring_prod__submit(&tx, BATCH_SIZE);
