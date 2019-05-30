@@ -31,6 +31,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ether.h>
+#include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <linux/if_link.h>
@@ -69,7 +70,6 @@ static struct frame template = {
 		.frag_off = 0x40,
 		.ttl = 64,
 		.protocol = IPPROTO_UDP,
-		.check = __constant_htons(0x41c7),
 		.saddr = ipv4_addr(192, 168, 85, 2),
 		.daddr = ipv4_addr(192, 168, 85, 1),
 	},
@@ -112,8 +112,28 @@ static uint32_t prog_id;
 
 static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 {
-	fprintf(stderr, "usage: %s [-s sendermac|rand] [-d destmac|rand] iface\n", argv0);
+	fprintf(stderr, "usage: %s [-s sendermac|rand] [-d destmac|rand] [-S srcip] [-D dstip] iface\n", argv0);
 	exit(ret);
+}
+
+void ip_checksum(struct iphdr *iph)
+{
+	unsigned long sum = 0;
+	uint16_t *ip1 = (uint16_t *)iph;
+	int i;
+
+	iph->check = 0;
+
+	for (i = 0; i < iph->ihl * 2; i++) {
+		sum += htons(ip1[i]);
+		if (sum & 0x80000000)
+			sum = (sum & 0xFFFF) + (sum >> 16);
+	}
+
+	while (sum >> 16)
+		sum = (sum & 0xFFFF) + (sum >> 16);
+
+	iph->check = htons(~sum);
 }
 
 static int xsk_configure_socket(void)
@@ -180,7 +200,7 @@ static int setup(int argc, char *argv[])
 	int c, i;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:d:h")) != -1)
+	while ((c = getopt(argc, argv, "s:d:S:D:h")) != -1)
 		switch (c) {
 		case 'h':
 			usage(argv[0], 0);
@@ -194,6 +214,12 @@ static int setup(int argc, char *argv[])
 			if (!rand_saddr && !ether_aton_r(optarg, &saddr))
 				usage(argv[0], 1);
 			break;
+		case 'S':
+			template.ip.saddr = inet_addr(optarg);
+			break;
+		case 'D':
+			template.ip.daddr = inet_addr(optarg);
+			break;
 		default:
 			usage(argv[0], 1);
 		}
@@ -201,15 +227,17 @@ static int setup(int argc, char *argv[])
 	if (optind != argc - 1)
 		usage(argv[0], 1);
 
+	opt_if = argv[optind];
+	opt_ifindex = if_nametoindex(opt_if);
+	if (!opt_ifindex)
+		err("if_nametoindex(): %s\n", strerror(errno));
+
 	if (rand_daddr)
 		seed_mac(template.ether.ether_dhost);
 	if (rand_saddr)
 		seed_mac(template.ether.ether_shost);
 
-	opt_if = argv[optind];
-	opt_ifindex = if_nametoindex(opt_if);
-	if (!opt_ifindex)
-		err("if_nametoindex(): %s\n", strerror(errno));
+	ip_checksum(&template.ip);
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r))
 		err("setrlimit(RLIMIT_MEMLOCK): %s\n", strerror(errno));
