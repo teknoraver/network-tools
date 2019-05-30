@@ -234,8 +234,12 @@ static int setup(int argc, char *argv[])
 
 	if (rand_daddr)
 		seed_mac(template.ether.ether_dhost);
+	else
+		memcpy(template.ether.ether_dhost, daddr.ether_addr_octet, ETH_ALEN);
 	if (rand_saddr)
 		seed_mac(template.ether.ether_shost);
+	else
+		memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
 
 	ip_checksum(&template.ip);
 
@@ -256,13 +260,9 @@ static int setup(int argc, char *argv[])
 	for (i = 0; i < NUM_FRAMES; i++) {
 		if (rand_daddr)
 			rand_mac(template.ether.ether_dhost);
-		else
-			memcpy(template.ether.ether_dhost, daddr.ether_addr_octet, ETH_ALEN);
 
 		if (rand_saddr)
 			rand_mac(template.ether.ether_shost);
-		else
-			memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
 
 		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE), &template, sizeof(template));
 	}
