@@ -2,7 +2,7 @@
 tools to measure network throughput and latency
 
 ## flooz
-flooz is a tiny, fast, traffic generator for Linux. Flooz uses zero-copy I/O and skips the kernel Qdisc to achieve maximum performances
+flooz is a tiny, fast, traffic generator for Linux. Flooz uses AF_XDP to achieve maximum performances
 
 ## weed
 weed is an end-to-end delay calculator. It sends packets to an interface, and measures how much time elapses until the packet can be received on another interface
