@@ -9,3 +9,6 @@ weed is an end-to-end delay calculator. It sends packets to an interface, and me
 
 ## shtraf
 shtraf is a shell script which shows tx and rx throughput and packets per seconds which are flowing through an interface
+
+## utraf
+like shtraf, but written in C and more precise ;)

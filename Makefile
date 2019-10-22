@@ -1,5 +1,5 @@
 KDIR ?= /lib/modules/$(shell uname -r)/build
-TOOLS := weed flooz
+TOOLS := weed utraf flooz
 CFLAGS := -pipe -Wall -Wno-address-of-packed-member $(if $(DEBUG),-O0 -ggdb3,-O3)
 
 all: $(TOOLS)
