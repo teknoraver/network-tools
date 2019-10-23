@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <time.h>
@@ -32,6 +33,12 @@
 static int ifindex;
 static int fd;
 static char buf[4096];
+
+static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+{
+	fprintf(stderr, "usage: %s [-i interval] iface\n", argv0);
+	exit(ret);
+}
 
 static uint64_t time_sub(struct timespec *since, struct timespec *to)
 {
@@ -119,13 +126,21 @@ int main(int argc, char *argv[])
 	uint64_t deltat, txpps, rxpps, txbps, rxbps;
 	struct rtnl_link_stats64 olds, news;
 	struct timespec oldt, newt;
+	int interval = 1000000, c;
 
-	if (argc != 2) {
-		fprintf(stderr, "missing interface name\n");
-		return 1;
-	}
+	while ((c = getopt(argc, argv, "hi:")) != -1)
+		switch (c) {
+		case 'h':
+			usage(argv[0], 0);
+		case 'i':
+			interval = atof(optarg) * 1000000;
+			break;
+		}
 
-	ifindex = if_nametoindex(argv[1]);
+	if (optind != argc - 1)
+		usage(argv[0], 1);
+
+	ifindex = if_nametoindex(argv[optind]);
 	if (!ifindex) {
 		perror("if_nametoindex");
 		return 1;
@@ -141,7 +156,7 @@ int main(int argc, char *argv[])
 		return 1;
 
 	while (1) {
-		sleep(1);
+		usleep(interval);
 
 		if (get_link_stats(&news, &newt))
 			return 1;
