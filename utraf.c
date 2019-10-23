@@ -34,9 +34,57 @@ static int ifindex;
 static int fd;
 static char buf[4096];
 
+#define human(x) decimals(x), rounded(x), suffix(x)
+#define H ".*f %s"
+
+static double rounded(uint64_t n)
+{
+	if (n >= 9999500000)
+		return n / 1000000000.0;
+	if (n >= 9999500)
+		return n / 1000000.0;
+	if (n > 9999)
+		return n / 1000.0;
+	return n;
+}
+
+static int decimals(uint64_t n)
+{
+	if (n >= 999950000000)
+		return 0;
+	if (n >= 99995000000)
+		return 1;
+	if (n >= 9999500000)
+		return 2;
+	if (n >= 999950000)
+		return 0;
+	if (n >= 99995000)
+		return 1;
+	if (n >= 9999500)
+		return 2;
+	if (n >= 999950)
+		return 0;
+	if (n >= 99995)
+		return 1;
+	if (n > 9999)
+		return 2;
+	return 0;
+}
+
+static char* suffix(uint64_t n)
+{
+	if (n >= 9999500000)
+		return "G";
+	if (n >= 9999500)
+		return "M";
+	if (n > 9999)
+		return "K";
+	return "";
+}
+
 static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 {
-	fprintf(stderr, "usage: %s [-i interval] iface\n", argv0);
+	fprintf(ret ? stderr : stdout, "usage: %s [-i interval] iface\n", argv0);
 	exit(ret);
 }
 
@@ -167,8 +215,8 @@ int main(int argc, char *argv[])
 		txbps = (news.tx_bytes - olds.tx_bytes) * 8 * B / deltat;
 		rxbps = (news.rx_bytes - olds.rx_bytes) * 8 * B / deltat;
 
-		printf("tx: %lu bps %lu pps tx %lu bps pps: %lu\n",
-		       txbps, txpps, rxbps, rxpps);
+		printf("tx: %"H"bps %"H"pps rx: %"H"bps %"H"pps\n",
+		       human(txbps), human(txpps), human(rxbps), human(rxpps));
 
 		olds = news;
 		oldt = newt;
