@@ -91,17 +91,16 @@ static struct frame template = {
 		.id = __constant_htons(0xcda3),
 		.frag_off = 0x40,
 		.ttl = 64,
-		.protocol = IPPROTO_UDPLITE,
-		.check = __constant_htons(0x414a),
+		.protocol = IPPROTO_UDP,
+		.check = __constant_htons(0x41c1),
 		.saddr = ipv4_addr(192, 168, 85, 2),
 		.daddr = ipv4_addr(192, 168, 85, 1),
 	},
 	.udp = {
-		.source = __constant_htons(7),
-		.dest = __constant_htons(7),
-		/* no checksum */
+		.source = __constant_htons(9),
+		.dest = __constant_htons(9),
 		.len = __constant_htons(8),
-		.check = __constant_htons(0xd47b),
+		/* no checksum */
 	},
 	.magic = __constant_cpu_to_be64(0x5274742043616C63),
 };
