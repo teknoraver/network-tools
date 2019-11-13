@@ -4,6 +4,9 @@ CFLAGS := -pipe -Wall -Wno-address-of-packed-member $(if $(DEBUG),-O0 -ggdb3,-O3
 
 all: $(TOOLS)
 
+$(KDIR)/tools/lib/bpf/libbpf.a:
+	$(MAKE) -C $(KDIR)/tools/lib/bpf/
+
 weed: CFLAGS += -pthread
 
 flooz: CPPFLAGS += -I$(KDIR)/tools/lib
