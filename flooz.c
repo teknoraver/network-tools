@@ -34,9 +34,29 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <linux/bpf.h>
 #include <linux/if_link.h>
+#include <linux/if_xdp.h>
+#include <linux/if_ether.h>
 #include <sys/resource.h>
+
+#ifndef XDP_RING_NEED_WAKEUP
+#define XDP_RING_NEED_WAKEUP (1 << 0)
+#endif
+
+#ifndef XSK_UNALIGNED_BUF_OFFSET_SHIFT
+/* Masks for unaligned chunks mode */
+#define XSK_UNALIGNED_BUF_OFFSET_SHIFT 48
+#endif
+
+#ifndef XSK_UNALIGNED_BUF_ADDR_MASK
+#define XSK_UNALIGNED_BUF_ADDR_MASK \
+	((1ULL << XSK_UNALIGNED_BUF_OFFSET_SHIFT) - 1)
+#endif
+
+#include <bpf/libbpf.h>
 #include <bpf/xsk.h>
+#include <bpf/bpf.h>
 
 #define NUM_FRAMES (4 * 1024)
 #define BATCH_SIZE 64

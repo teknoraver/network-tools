@@ -30,7 +30,7 @@
 #include <linux/if.h>
 #include <time.h>
 
-#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
 #include "common.h"

@@ -11,11 +11,11 @@ $(KDIR)/tools/lib/bpf/libbpf.a:
 weed: CFLAGS += -pthread
 
 flooz: CPPFLAGS += -I$(KDIR)/tools/lib
-flooz: LDLIBS += -lelf
+flooz: LDLIBS += -lelf -lz
 flooz: $(KDIR)/tools/lib/bpf/libbpf.a
 
 bptraf: CPPFLAGS += -I $(KDIR)/tools/lib
-bptraf: LDLIBS += -lelf
+bptraf: LDLIBS += -lelf -lz
 bptraf: $(KDIR)/tools/lib/bpf/libbpf.a
 
 kernel_%.o: kernel_%.c
