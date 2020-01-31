@@ -153,7 +153,7 @@ static void stats(int fd, useconds_t interval)
 
 static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 {
-	fprintf(ret ? stderr : stdout, "usage: %s [-i interval] iface\n", argv0);
+	fprintf(ret ? stderr : stdout, "usage: %s [-d] [-i interval] iface\n", argv0);
 	exit(ret);
 }
 
