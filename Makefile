@@ -1,6 +1,6 @@
 KDIR ?= /lib/modules/$(shell uname -r)/build
 BPFS := kernel_traf.o kernel_drop.o
-TOOLS := weed utraf bptraf flooz
+TOOLS := weed utraf bptraf xdperf
 CFLAGS := -pipe -Wall -Wno-address-of-packed-member $(if $(DEBUG),-O0 -ggdb3,-O3)
 
 all: $(TOOLS) $(BPFS)
@@ -10,9 +10,9 @@ $(KDIR)/tools/lib/bpf/libbpf.a:
 
 weed: CFLAGS += -pthread
 
-flooz: CPPFLAGS += -I$(KDIR)/tools/lib
-flooz: LDLIBS += -lelf -lz
-flooz: $(KDIR)/tools/lib/bpf/libbpf.a
+xdperf: CPPFLAGS += -I$(KDIR)/tools/lib
+xdperf: LDLIBS += -lelf -lz
+xdperf: $(KDIR)/tools/lib/bpf/libbpf.a
 
 bptraf: CPPFLAGS += -I $(KDIR)/tools/lib
 bptraf: LDLIBS += -lelf -lz
