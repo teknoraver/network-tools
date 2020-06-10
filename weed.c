@@ -1,6 +1,6 @@
 /*
  * weed.c - watch end-to-end delay
- * Copyright (C) 2018 Matteo Croce <mcroce@redhat.com>
+ * Copyright (C) 2018-2020 Matteo Croce <mcroce@microsoft.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

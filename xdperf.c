@@ -1,6 +1,6 @@
 /*
- * flooz.c - simple zero-copy traffic generator
- * Copyright (C) 2018 Matteo Croce <mcroce@redhat.com>
+ * xdperf.c - simple zero-copy traffic generator
+ * Copyright (C) 2018-2020 Matteo Croce <mcroce@microsoft.com>
  *
  * AF_XDP support taken from kernel's samples/bpf/xdpsock_user.c
  *
@@ -216,8 +216,6 @@ static int setup(int argc, char *argv[])
 
 	while ((c = getopt(argc, argv, "s:d:S:D:l:h")) != -1)
 		switch (c) {
-		case 'h':
-			usage(argv[0], 0);
 		case 'd':
 			rand_daddr = !strcmp(optarg, "rand");
 			if (!rand_daddr && !ether_aton_r(optarg, &daddr))
@@ -241,6 +239,8 @@ static int setup(int argc, char *argv[])
 				err("datalen must be between 46 and 1500\n");
 			datalen -= sizeof(template.ip) + sizeof(template.udp);
 			break;
+		case 'h':
+			usage(argv[0], 0);
 		default:
 			usage(argv[0], 1);
 		}
