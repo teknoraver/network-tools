@@ -60,7 +60,6 @@
 
 #define NUM_FRAMES (4 * 1024)
 #define BATCH_SIZE 64
-#define XDP_FLAGS (XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_DRV_MODE)
 
 #define ipv4_addr(o1, o2, o3, o4) __constant_htonl( \
 	(o1) << 24 | \
@@ -97,6 +96,7 @@ static struct frame template = {
 	},
 };
 
+static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_DRV_MODE;
 static struct xsk_ring_prod fq;
 static struct xsk_ring_cons cq;
 static struct xsk_umem *umem;
@@ -125,7 +125,15 @@ static uint32_t prog_id;
 
 static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 {
-	fprintf(stderr, "usage: %s [-s sendermac|rand] [-d destmac|rand] [-S srcip] [-D dstip] [-l len] iface\n", argv0);
+	fprintf(stderr,
+		"usage: %s [-g][-s src-mac][-d dest-mac][-S src-ip][-D dst-ip][-l len] <iface>\n"
+		"\t\t-g: run in skb mode (XDP generic)\n"
+		"\t\t-s: source mac|random\n"
+		"\t\t-d: destination mac|random\n"
+		"\t\t-S: source IP|random\n"
+		"\t\t-D: destination IP|random\n"
+		"\t\t-L: frame length\n",
+		argv0);
 	exit(ret);
 }
 
@@ -154,7 +162,7 @@ static int xsk_configure_socket(void)
 	struct xsk_socket_config cfg = {
 		.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS,
 		.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS,
-		.xdp_flags = XDP_FLAGS,
+		.xdp_flags = xdp_flags,
 	};
 	uint32_t idx;
 	int ret;
@@ -214,7 +222,7 @@ static int setup(int argc, char *argv[])
 	int c, i;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:d:S:D:l:h")) != -1)
+	while ((c = getopt(argc, argv, "s:d:S:D:l:hg")) != -1)
 		switch (c) {
 		case 'd':
 			rand_daddr = !strcmp(optarg, "rand");
@@ -238,6 +246,10 @@ static int setup(int argc, char *argv[])
 			if (datalen + sizeof(template.ether) + 4 < 64|| datalen > ETH_DATA_LEN)
 				err("datalen must be between 46 and 1500\n");
 			datalen -= sizeof(template.ip) + sizeof(template.udp);
+			break;
+		case 'g':
+			xdp_flags &= ~XDP_FLAGS_DRV_MODE;
+			xdp_flags |= XDP_FLAGS_SKB_MODE;
 			break;
 		case 'h':
 			usage(argv[0], 0);
@@ -321,7 +333,7 @@ static void complete_tx_only(void)
 
 static void int_exit(int sig)
 {
-	bpf_set_link_xdp_fd(opt_ifindex, -1, XDP_FLAGS);
+	bpf_set_link_xdp_fd(opt_ifindex, -1, xdp_flags);
 
 	exit(0);
 }
