@@ -148,6 +148,8 @@ int xdp_main(struct xdp_md *ctx)
 		plen -= sizeof(*ip6h);
 		break;
 	}
+	default:
+		   break;
 	}
 
 	if (ipproto)
