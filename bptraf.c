@@ -99,6 +99,7 @@ static char *protocols[] = {
 	[IPV4] = "IPv4",
 	[IPV6] = "IPv6",
 	[PPPOE] = "PPPoE",
+	[ARP] = "ARP",
 	[ICMP] = "ICMP",
 	[TCP] = "TCP",
 	[UDP] = "UDP",
