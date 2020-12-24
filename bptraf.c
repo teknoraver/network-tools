@@ -95,6 +95,7 @@ static void int_exit(int sig)
 
 static char *protocols[] = {
 	[ALL] = "all",
+	[BROADCAST] = "broadcast",
 	[IPV4] = "IPv4",
 	[IPV6] = "IPv6",
 	[PPPOE] = "PPPoE",

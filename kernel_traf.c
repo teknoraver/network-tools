@@ -121,6 +121,9 @@ int xdp_main(struct xdp_md *ctx)
 	ethproto = eth->h_proto;
 
 	inc_stats(ALL, plen);
+	if (eth->h_dest[0] & 1)
+		inc_stats(BROADCAST, plen);
+
 	plen -= sizeof(*eth);
 
 	proto = parse_eth(ethproto);

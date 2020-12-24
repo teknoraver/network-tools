@@ -4,6 +4,7 @@
 enum protocols {
 	/* all */
 	ALL,
+	BROADCAST,
 
 	/* Ethernet */
 	IPV4,
