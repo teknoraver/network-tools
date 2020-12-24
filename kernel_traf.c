@@ -82,7 +82,7 @@ static enum protocols parse_eth(uint16_t type)
 		return PPPOE;
 	}
 
-	return 0;
+	return INVALID;
 }
 
 static enum protocols parse_ip(uint8_t proto)
@@ -100,7 +100,7 @@ static enum protocols parse_ip(uint8_t proto)
 		return SCTP;
 	}
 
-	return 0;
+	return INVALID;
 }
 
 SEC("prog")
@@ -108,10 +108,9 @@ int xdp_main(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(uintptr_t)ctx->data_end;
 	void *data = (void *)(uintptr_t)ctx->data;
+	enum protocols proto, ipproto = INVALID;
 	size_t plen = data_end - data + 1;
 	struct ethhdr *eth = data;
-	enum protocols proto;
-	uint8_t ipproto = 0;
 	uint16_t ethproto;
 
 	/* sanity check needed by the eBPF verifier */
@@ -127,7 +126,7 @@ int xdp_main(struct xdp_md *ctx)
 	plen -= sizeof(*eth);
 
 	proto = parse_eth(ethproto);
-	if (proto)
+	if (proto != INVALID)
 		inc_stats(proto, plen);
 
 	switch (proto) {
@@ -155,7 +154,7 @@ int xdp_main(struct xdp_md *ctx)
 		   break;
 	}
 
-	if (ipproto)
+	if (ipproto != INVALID)
 		inc_stats(ipproto, plen);
 
 	return XDP_PASS;

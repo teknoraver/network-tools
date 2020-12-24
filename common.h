@@ -2,6 +2,7 @@
 #define COMMON_H
 
 enum protocols {
+	INVALID = -1,
 	/* all */
 	ALL,
 	BROADCAST,
