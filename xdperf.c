@@ -245,9 +245,9 @@ static int setup(int argc, char *argv[])
 		case 'l':
 			datalen = atoi(optarg);
 			/* 4 extra byte for FCS */
-			if (datalen + sizeof(template.ether) + 4 < 64|| datalen > ETH_DATA_LEN)
-				err("datalen must be between 46 and 1500\n");
-			datalen -= sizeof(template.ip) + sizeof(template.udp);
+			if (datalen < ETH_ZLEN || datalen > ETH_FRAME_LEN)
+				err("datalen must be between %d and %d\n", ETH_ZLEN, ETH_FRAME_LEN);
+			datalen -= sizeof(template);
 			break;
 		case 'g':
 			xdp_flags &= ~XDP_FLAGS_DRV_MODE;
