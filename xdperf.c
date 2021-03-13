@@ -112,6 +112,7 @@ static bool rand_saddr = true;
 static struct ether_addr daddr;
 static struct ether_addr saddr;
 static int datalen = 18;
+static bool raw_frames;
 
 static const char *opt_if;
 static int opt_ifindex;
@@ -132,7 +133,8 @@ static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 		"\t\t-d: destination mac|random\n"
 		"\t\t-S: source IP|random\n"
 		"\t\t-D: destination IP|random\n"
-		"\t\t-l: frame length\n",
+		"\t\t-l: frame length\n"
+		"\t\t-n: send raw ethernet frames\n",
 		argv0);
 	exit(ret);
 }
@@ -222,7 +224,7 @@ static int setup(int argc, char *argv[])
 	int c, i;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:d:S:D:l:hg")) != -1)
+	while ((c = getopt(argc, argv, "s:d:S:D:l:nhg")) != -1)
 		switch (c) {
 		case 'd':
 			rand_daddr = !strcmp(optarg, "rand");
@@ -251,6 +253,19 @@ static int setup(int argc, char *argv[])
 			xdp_flags &= ~XDP_FLAGS_DRV_MODE;
 			xdp_flags |= XDP_FLAGS_SKB_MODE;
 			break;
+		case 'n':
+			raw_frames = true;
+			/* Frames with ethertypes lower than ETH_P_802_3_MIN (0x600) are
+			 * interpreted as DIX frames, where the ethertype field really
+			 * is the frame length. Linux tries to inspect these frames with
+			 * the llc dissector which costs extra CPU power.
+			 * An ethertype higher or equal to ETH_P_802_3_MIN is safe
+			 * to use as 1536 is an invalid frame size.
+			 */
+			template.ether.ether_type = __constant_htons(ETH_P_802_3_MIN);
+			memset(&template.ip, 0, sizeof(template.ip) + sizeof(template.udp));
+			memset(payload, 0, sizeof(payload));
+			break;
 		case 'h':
 			usage(argv[0], 0);
 		default:
@@ -265,8 +280,10 @@ static int setup(int argc, char *argv[])
 	if (!opt_ifindex)
 		err("if_nametoindex(): %s\n", strerror(errno));
 
-	template.ip.tot_len = htons(datalen + sizeof(template.ip) + sizeof(template.udp));
-	template.udp.len = htons(datalen + sizeof(template.udp));
+	if (!raw_frames) {
+		template.ip.tot_len = htons(datalen + sizeof(template.ip) + sizeof(template.udp));
+		template.udp.len = htons(datalen + sizeof(template.udp));
+	}
 
 	if (rand_daddr)
 		seed_mac(template.ether.ether_dhost);
@@ -277,10 +294,12 @@ static int setup(int argc, char *argv[])
 	else
 		memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
 
-	ip_checksum(&template.ip);
+	if (!raw_frames) {
+		ip_checksum(&template.ip);
 
-	for (i = 0; i < datalen; i++)
-		payload[i] = i;
+		for (i = 0; i < datalen; i++)
+			payload[i] = i;
+	}
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r))
 		err("setrlimit(RLIMIT_MEMLOCK): %s\n", strerror(errno));
