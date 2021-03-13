@@ -291,10 +291,11 @@ static int setup(int argc, char *argv[])
 
 	ret = xsk_umem__create(&umem, buffer, NUM_FRAMES * XSK_UMEM__DEFAULT_FRAME_SIZE, &fq, &cq, NULL);
 	if (ret)
-		return 1;
+		err("xsk_umem__create(): %s\n", strerror(errno));
 
-	if (xsk_configure_socket())
-		return 1;
+	ret = xsk_configure_socket();
+	if (ret)
+		err("xsk_umem__create(): %s\n", strerror(errno));
 
 	for (i = 0; i < NUM_FRAMES; i++) {
 
