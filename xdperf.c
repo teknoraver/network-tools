@@ -132,7 +132,7 @@ static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 		"\t\t-d: destination mac|random\n"
 		"\t\t-S: source IP|random\n"
 		"\t\t-D: destination IP|random\n"
-		"\t\t-L: frame length\n",
+		"\t\t-l: frame length\n",
 		argv0);
 	exit(ret);
 }
