@@ -74,6 +74,7 @@ struct __attribute__ ((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
 	struct udphdr udp;
+	char payload[ETH_DATA_LEN - sizeof(struct iphdr) - sizeof(struct udphdr)];
 };
 
 static struct frame template = {
@@ -220,7 +221,6 @@ static void seed_mac(unsigned char *mac)
 static int setup(int argc, char *argv[])
 {
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-	char payload[ETH_DATA_LEN];
 	int c, i;
 	int ret;
 
@@ -247,7 +247,7 @@ static int setup(int argc, char *argv[])
 			/* 4 extra byte for FCS */
 			if (datalen < ETH_ZLEN || datalen > ETH_FRAME_LEN)
 				err("datalen must be between %d and %d\n", ETH_ZLEN, ETH_FRAME_LEN);
-			datalen -= sizeof(template);
+			datalen -= sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp);
 			break;
 		case 'g':
 			xdp_flags &= ~XDP_FLAGS_DRV_MODE;
@@ -263,8 +263,7 @@ static int setup(int argc, char *argv[])
 			 * to use as 1536 is an invalid frame size.
 			 */
 			template.ether.ether_type = __constant_htons(ETH_P_802_3_MIN);
-			memset(&template.ip, 0, sizeof(template.ip) + sizeof(template.udp));
-			memset(payload, 0, sizeof(payload));
+			memset(&template.ip, 0, sizeof(template) - ETH_HLEN);
 			break;
 		case 'h':
 			usage(argv[0], 0);
@@ -298,7 +297,7 @@ static int setup(int argc, char *argv[])
 		ip_checksum(&template.ip);
 
 		for (i = 0; i < datalen; i++)
-			payload[i] = i;
+			template.payload[i] = i;
 	}
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r))
@@ -324,8 +323,8 @@ static int setup(int argc, char *argv[])
 		if (rand_saddr)
 			rand_mac(template.ether.ether_shost);
 
-		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE), &template, sizeof(template));
-		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE) + sizeof(template), payload, datalen);
+		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE),
+		       &template, sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp) + datalen);
 	}
 
 	return 0;
@@ -374,7 +373,7 @@ int main(int argc, char *argv[])
 
 			for (i = 0; i < BATCH_SIZE; i++) {
 				xsk_ring_prod__tx_desc(&tx, idx + i)->addr = (frame_nb + i) << XSK_UMEM__DEFAULT_FRAME_SHIFT;
-				xsk_ring_prod__tx_desc(&tx, idx + i)->len = sizeof(template) + datalen;
+				xsk_ring_prod__tx_desc(&tx, idx + i)->len = sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp) + datalen;
 			}
 
 			xsk_ring_prod__submit(&tx, BATCH_SIZE);
