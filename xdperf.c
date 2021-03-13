@@ -107,8 +107,8 @@ static struct xsk_ring_prod tx;
 static struct xsk_socket *xsk;
 static uint32_t outstanding_tx;
 
-static int rand_daddr = 1;
-static int rand_saddr = 1;
+static bool rand_daddr = true;
+static bool rand_saddr = true;
 static struct ether_addr daddr;
 static struct ether_addr saddr;
 static int datalen = 18;
