@@ -1,4 +1,4 @@
-BPFS := kernel_traf.o kernel_drop.o
+BPFS := kernel_traf.o kernel_drop.o kernel_dropall.o kernel_passall.o
 TOOLS := weed utraf bptraf xdperf
 CFLAGS := -pipe -Wall -Wno-address-of-packed-member $(if $(DEBUG),-O0 -ggdb3,-O3)
 
