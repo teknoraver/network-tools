@@ -33,6 +33,7 @@
 #include <netinet/ether.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/udp.h>
 #include <linux/bpf.h>
 #include <linux/if_link.h>
@@ -73,7 +74,10 @@
 struct __attribute__ ((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
-	struct udphdr udp;
+	union {
+		struct icmphdr icmp;
+		struct udphdr udp;
+	};
 	char payload[ETH_DATA_LEN - sizeof(struct iphdr) - sizeof(struct udphdr)];
 };
 
@@ -97,6 +101,12 @@ static struct frame template = {
 	},
 };
 
+enum {
+	MODE_UDP,
+	MODE_RAW,
+	MODE_PING,
+} mode = MODE_UDP;
+
 static __u32 xdp_flags = XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_DRV_MODE;
 static struct xsk_ring_prod fq;
 static struct xsk_ring_cons cq;
@@ -113,7 +123,6 @@ static bool rand_saddr = true;
 static struct ether_addr daddr;
 static struct ether_addr saddr;
 static int datalen = 18;
-static bool raw_frames;
 
 static const char *opt_if;
 static int opt_ifindex;
@@ -135,21 +144,19 @@ static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 		"\t\t-S: source IP|random\n"
 		"\t\t-D: destination IP|random\n"
 		"\t\t-l: frame length\n"
+		"\t\t-i: ICMP mode\n"
 		"\t\t-n: send raw ethernet frames\n",
 		argv0);
 	exit(ret);
 }
 
-void ip_checksum(struct iphdr *iph)
+uint16_t ip_checksum(uint16_t *buf, size_t len)
 {
 	unsigned long sum = 0;
-	uint16_t *ip1 = (uint16_t *)iph;
 	int i;
 
-	iph->check = 0;
-
-	for (i = 0; i < iph->ihl * 2; i++) {
-		sum += htons(ip1[i]);
+	for (i = 0; i < len; i++) {
+		sum += htons(buf[i]);
 		if (sum & 0x80000000)
 			sum = (sum & 0xFFFF) + (sum >> 16);
 	}
@@ -157,7 +164,7 @@ void ip_checksum(struct iphdr *iph)
 	while (sum >> 16)
 		sum = (sum & 0xFFFF) + (sum >> 16);
 
-	iph->check = htons(~sum);
+	return htons(~sum);
 }
 
 static int xsk_configure_socket(void)
@@ -224,7 +231,7 @@ static int setup(int argc, char *argv[])
 	int c, i;
 	int ret;
 
-	while ((c = getopt(argc, argv, "s:d:S:D:l:nhg")) != -1)
+	while ((c = getopt(argc, argv, "s:d:S:D:l:nihg")) != -1)
 		switch (c) {
 		case 'd':
 			rand_daddr = !strcmp(optarg, "rand");
@@ -253,8 +260,17 @@ static int setup(int argc, char *argv[])
 			xdp_flags &= ~XDP_FLAGS_DRV_MODE;
 			xdp_flags |= XDP_FLAGS_SKB_MODE;
 			break;
+		case 'i':
+			mode = MODE_PING;
+			srand(time(NULL));
+			template.ip.protocol = IPPROTO_ICMP;
+			template.icmp.type = ICMP_ECHO;
+			template.icmp.code = 0;
+			template.icmp.un.echo.id = rand();
+			template.icmp.un.echo.sequence = htons(1);
+			break;
 		case 'n':
-			raw_frames = true;
+			mode = MODE_RAW;
 			/* Frames with ethertypes lower than ETH_P_802_3_MIN (0x600) are
 			 * interpreted as DIX frames, where the ethertype field really
 			 * is the frame length. Linux tries to inspect these frames with
@@ -279,9 +295,10 @@ static int setup(int argc, char *argv[])
 	if (!opt_ifindex)
 		err("if_nametoindex(): %s\n", strerror(errno));
 
-	if (!raw_frames) {
+	if (mode != MODE_RAW) {
 		template.ip.tot_len = htons(datalen + sizeof(template.ip) + sizeof(template.udp));
-		template.udp.len = htons(datalen + sizeof(template.udp));
+		if (mode == MODE_UDP)
+			template.udp.len = htons(datalen + sizeof(template.udp));
 	}
 
 	if (rand_daddr)
@@ -293,8 +310,9 @@ static int setup(int argc, char *argv[])
 	else
 		memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
 
-	if (!raw_frames) {
-		ip_checksum(&template.ip);
+	if (mode != MODE_RAW) {
+		template.ip.check = 0;
+		template.ip.check = ip_checksum((uint16_t *)&template.ip, template.ip.ihl * 2);
 
 		for (i = 0; i < datalen; i++)
 			template.payload[i] = i;
@@ -325,6 +343,12 @@ static int setup(int argc, char *argv[])
 
 		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE),
 		       &template, sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp) + datalen);
+		if (mode == MODE_PING) {
+			template.icmp.un.echo.sequence = htons(ntohs(template.icmp.un.echo.sequence) + 1);
+			template.icmp.checksum = 0;
+			template.icmp.checksum = ip_checksum((uint16_t *)&template.icmp,
+							     (sizeof(template.icmp) + datalen) / sizeof(uint16_t));
+		}
 	}
 
 	return 0;
