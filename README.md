@@ -1,8 +1,13 @@
 # network-tools
 tools to measure network throughput and latency
 
-## flooz
-flooz is a tiny, fast, traffic generator for Linux. Flooz uses AF_XDP to achieve maximum performances
+## xdperf
+xdperf is a tiny, fast, traffic generator for Linux. It uses AF\_XDP to achieve maximum performances.  
+Only simple traffic patterns are supported, UDP, ICMP ping or raw ethernet frames.
+
+## bptraf
+bptraf shows per protocol counters about received packet. It uses XDP to count the packet, so it's faster than AF\_PACKET based implementations.  
+Optonally, it can drop all the received traffic instead of passing it to the networking stack.
 
 ## weed
 weed is an end-to-end delay calculator. It sends packets to an interface, and measures how much time elapses until the packet can be received on another interface
