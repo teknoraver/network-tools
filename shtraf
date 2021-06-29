@@ -17,5 +17,9 @@ get_stats() {
 get_stats "$1"
 while sleep 1 ; do
 	get_stats "$1"
-	printf 'rx: %u Mbps %u kpps tx: %u Mbps %u kpps\n' $(((newrx-rx) / 125000)) $(((newrxp-rxp) / 1000)) $(((newtx-tx) / 125000)) $(((newtxp-txp) / 1000))
+	printf 'rx: %u Mbps %u kpps tx: %u Mbps %u kpps\n' \
+		$(((newrx-rx) / 125000)) \
+		$(((newrxp-rxp) / 1000)) \
+		$(((newtx-tx) / 125000)) \
+		$(((newtxp-txp) / 1000))
 done
