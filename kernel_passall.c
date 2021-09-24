@@ -3,10 +3,9 @@
  */
 
 #include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
-#define SEC(NAME) __attribute__((section(NAME), used))
-
-SEC("prog")
+SEC("xdp")
 int xdp_main(struct xdp_md *ctx)
 {
 	return XDP_PASS;

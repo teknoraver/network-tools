@@ -11,7 +11,7 @@ xdperf: LDLIBS += -lbpf -lelf -lz
 bptraf: LDLIBS += -lbpf -lelf -lz
 
 kernel_%.o: kernel_%.c
-	clang -O2 -Wall -c $< -o - -emit-llvm |llc - -o $@ -march=bpf -filetype=obj
+	clang -g -O2 -Wall -c $< -o - -emit-llvm |llc - -o $@ -march=bpf -filetype=obj
 
 clean::
 	$(RM) $(TOOLS) $(BPFS)

@@ -1,7 +1,7 @@
 /*
  * Sample XDP program, create statistics about interface traffic.
  * compile it with:
- * 	clang -O2 -Wall -ggdb3 -c kernel_drop.c -o - -emit-llvm | \
+ * 	clang -g -O2 -Wall -ggdb3 -c kernel_drop.c -o - -emit-llvm | \
  * 		llc - -o kernel_drop.o -march=bpf -filetype=obj
  * attach it to a device with:
  * 	ip link set dev lo xdp object kernel.o verbose
@@ -9,30 +9,16 @@
 
 #include <stdint.h>
 #include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
 
 #include "common.h"
 
-#define SEC(NAME) __attribute__((section(NAME), used))
-
-struct bpf_elf_map {
-	__u32 type;
-	__u32 size_key;
-	__u32 size_value;
-	__u32 max_elem;
-	__u32 flags;
-	__u32 id;
-	__u32 pinning;
-};
-
-struct bpf_elf_map SEC("maps") traf = {
-	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.size_key = sizeof(unsigned int),
-	.size_value = sizeof(struct trafdata),
-	.max_elem = _MAX_PROTO,
-};
-
-static void *(*bpf_map_lookup_elem)(void *map, void *key) =
-	(void *) BPF_FUNC_map_lookup_elem;
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, unsigned int);
+	__type(value, struct trafdata);
+	__uint(max_entries, _MAX_PROTO);
+} traf SEC(".maps");
 
 static void inc_stats(unsigned int key, int len)
 {
@@ -44,7 +30,7 @@ static void inc_stats(unsigned int key, int len)
 	}
 }
 
-SEC("prog")
+SEC("xdp")
 int xdp_main(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(uintptr_t)ctx->data_end;

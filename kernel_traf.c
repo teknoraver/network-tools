@@ -24,39 +24,25 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/tcp.h>
+#include <bpf/bpf_helpers.h>
 
 #include "common.h"
 
 /*
  * Sample XDP program, create statistics about interface traffic.
  * compile it with:
- * 	clang -O2 -Wall -ggdb3 -c kernel_traf.c -o - -emit-llvm | \
+ * 	clang -g -O2 -Wall -ggdb3 -c kernel_traf.c -o - -emit-llvm | \
  * 		llc - -o kernel_traf.o -march=bpf -filetype=obj
  * attach it to a device with:
  * 	ip link set dev lo xdp object kernel.o verbose
  */
 
-#define SEC(NAME) __attribute__((section(NAME), used))
-
-struct bpf_map_def {
-	unsigned int type;
-	unsigned int key_size;
-	unsigned int value_size;
-	unsigned int max_entries;
-	unsigned int map_flags;
-	unsigned int inner_map_idx;
-	unsigned int numa_node;
-};
-
-struct bpf_map_def SEC("maps") traf = {
-	.type = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size = sizeof(unsigned int),
-	.value_size = sizeof(struct trafdata),
-	.max_entries = _MAX_PROTO,
-};
-
-static void *(*bpf_map_lookup_elem)(void *map, void *key) =
-	(void *) BPF_FUNC_map_lookup_elem;
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, unsigned int);
+	__type(value, struct trafdata);
+	__uint(max_entries, _MAX_PROTO);
+} traf SEC(".maps");
 
 static void inc_stats(unsigned int key, int len)
 {
@@ -103,7 +89,7 @@ static enum protocols parse_ip(uint8_t proto)
 	return INVALID;
 }
 
-SEC("prog")
+SEC("xdp")
 int xdp_main(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(uintptr_t)ctx->data_end;

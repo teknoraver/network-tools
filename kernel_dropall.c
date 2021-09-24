@@ -3,8 +3,7 @@
  */
 
 #include <linux/bpf.h>
-
-#define SEC(NAME) __attribute__((section(NAME), used))
+#include <bpf/bpf_helpers.h>
 
 SEC("prog")
 int xdp_main(struct xdp_md *ctx)
