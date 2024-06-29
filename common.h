@@ -2,7 +2,7 @@
 #define COMMON_H
 
 enum protocols {
-	INVALID = -1,
+	INVALID,
 	/* all */
 	ALL,
 	BROADCAST,
@@ -22,8 +22,8 @@ enum protocols {
 };
 
 struct trafdata {
-	uint64_t packets;
-	uint64_t bytes;
+	__u64 packets;
+	__u64 bytes;
 };
 
 #endif

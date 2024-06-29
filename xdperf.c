@@ -56,8 +56,8 @@
 #endif
 
 #include <bpf/libbpf.h>
-#include <bpf/xsk.h>
 #include <bpf/bpf.h>
+#include <xdp/xsk.h>
 
 #define NUM_FRAMES (4 * 1024)
 #define BATCH_SIZE 64
@@ -127,7 +127,6 @@ static int datalen = 18;
 static const char *opt_if;
 static int opt_ifindex;
 static int opt_queue;
-static uint32_t prog_id;
 
 #define err(...) do { \
 		fprintf(stderr, __VA_ARGS__); \
@@ -181,10 +180,6 @@ static int xsk_configure_socket(void)
 	ret = xsk_socket__create(&xsk, opt_if, opt_queue, umem, &rx, &tx, &cfg);
 	if (ret)
 		err("xsk_socket__create() %s (%d)\n", strerror(-ret), -ret);
-
-	ret = bpf_get_link_xdp_id(opt_ifindex, &prog_id, cfg.xdp_flags);
-	if (ret)
-		err("bpf_get_link_xdp_id() %s (%d)\n", strerror(errno), errno);
 
 	ret = xsk_ring_prod__reserve(&fq, XSK_RING_PROD__DEFAULT_NUM_DESCS, &idx);
 	if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS)
@@ -376,7 +371,7 @@ static void complete_tx_only(void)
 
 static void int_exit(int sig)
 {
-	bpf_set_link_xdp_fd(opt_ifindex, -1, xdp_flags);
+	bpf_xdp_detach(opt_ifindex, xdp_flags, NULL);
 
 	exit(0);
 }

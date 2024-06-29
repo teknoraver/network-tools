@@ -3,3 +3,5 @@
 /utraf
 /bptraf
 *.o
+/kernel_*.skel.h
+/vmlinux.h

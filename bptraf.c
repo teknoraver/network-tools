@@ -28,12 +28,16 @@
 #include <net/if.h>
 #include <sys/socket.h>
 #include <linux/if.h>
+#include <linux/if_link.h>
 #include <time.h>
 
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 
 #include "common.h"
+
+#include "kernel_traf.skel.h"
+#include "kernel_drop.skel.h"
 
 static int ifindex;
 
@@ -89,7 +93,8 @@ static char* suffix(uint64_t n)
 
 static void int_exit(int sig)
 {
-	bpf_set_link_xdp_fd(ifindex, -1, 0);
+        LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
+	bpf_xdp_detach(ifindex, 0, &opts);
 	exit(0);
 }
 
@@ -126,13 +131,14 @@ static void stats(int fd, useconds_t interval)
 	clock_gettime(CLOCK_MONOTONIC, &oldts);
 
 	while (1) {
-		unsigned key = UINT_MAX;
+		unsigned key = 0;
+                unsigned next_key = 0;
 
 		usleep(interval);
 		clock_gettime(CLOCK_MONOTONIC, &newts);
 		deltat = time_sub(&oldts, &newts);
 
-		while (bpf_map_get_next_key(fd, &key, &key) != -1) {
+		while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
 			struct trafdata sum = { 0 };
 
 			bpf_map_lookup_elem(fd, &key, values);
@@ -148,6 +154,7 @@ static void stats(int fd, useconds_t interval)
 				       protocols[key], human(pkts), human(bytes));
 			}
 			tot[key] = sum;
+                        key = next_key;
 		}
 		oldts = newts;
 	}
@@ -161,12 +168,9 @@ static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 
 int main(int argc, char *argv[])
 {
-	struct bpf_prog_load_attr prog_load_attr = {
-		.prog_type	= BPF_PROG_TYPE_XDP,
-		.file		= "kernel_traf.o",
-	};
-	struct bpf_object *obj;
-	struct bpf_map *map;
+        LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
+        struct kernel_drop *skel_drop = NULL;
+        struct kernel_traf *skel_traf = NULL;
 	int interval = 1000000, c;
 	int fd;
 
@@ -179,9 +183,21 @@ int main(int argc, char *argv[])
 			interval = atof(optarg) * 1000000;
 			break;
 		case 'd':
-			prog_load_attr.file = "kernel_drop.o";
+                        skel_drop = kernel_drop__open_and_load();
+                        if (!skel_drop) {
+                                fprintf(stderr, "failed to open BPF object\n");
+                                return 1;
+                        }
 			break;
 		}
+
+        if (!skel_drop) {
+                skel_traf = kernel_traf__open_and_load();
+                if (!skel_traf) {
+                        fprintf(stderr, "failed to open BPF object\n");
+                        return 1;
+                }
+        }
 
 	if (optind != argc - 1)
 		usage(argv[0], 1);
@@ -189,29 +205,17 @@ int main(int argc, char *argv[])
 	ifindex = if_nametoindex(argv[optind]);
 	if (!ifindex) {
 		perror("if_nametoindex");
+                return 1;
 	}
 
-	if (bpf_prog_load_xattr(&prog_load_attr, &obj, &fd))
-		return 1;
-
-	if (!fd) {
-		perror("load bpf file");
-		return 1;
-	}
-
-	if (bpf_set_link_xdp_fd(ifindex, fd, 0) < 0) {
+	if (bpf_xdp_attach(ifindex,
+                           bpf_program__fd(skel_drop ? skel_drop->progs.xdp_main : skel_traf->progs.xdp_main),
+                           XDP_FLAGS_REPLACE, &opts) < 0) {
 		printf("link set xdp fd failed\n");
 		return 1;
 	}
 
-	close(fd);
-
-	map = bpf_map__next(NULL, obj);
-	if (!map) {
-		perror("finding a map\n");
-		return 1;
-	}
-	fd = bpf_map__fd(map);
+        fd = bpf_map__fd(skel_drop ? skel_drop->maps.traf : skel_traf->maps.traf);
 
 	signal(SIGINT, int_exit);
 	signal(SIGTERM, int_exit);

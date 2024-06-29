@@ -16,17 +16,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdint.h>
-#include <arpa/inet.h>
-#include <asm/byteorder.h>
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/tcp.h>
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 #include "common.h"
+
+#define ETH_P_ARP       0x0806
+#define ETH_P_IP        0x0800
+#define ETH_P_IPV6      0x86DD
+#define ETH_P_PPP_DISC  0x8863
+#define ETH_P_PPP_SES   0x8864
+#define IPPROTO_ICMP    1
+#define IPPROTO_ICMPV6  58
 
 /*
  * Sample XDP program, create statistics about interface traffic.
@@ -54,24 +57,24 @@ static void inc_stats(unsigned int key, int len)
 	}
 }
 
-static enum protocols parse_eth(uint16_t type)
+static enum protocols parse_eth(u16 type)
 {
 	switch (type) {
-	case __constant_ntohs(ETH_P_ARP):
+	case bpf_ntohs(ETH_P_ARP):
 		return ARP;
-	case __constant_ntohs(ETH_P_IP):
+	case bpf_ntohs(ETH_P_IP):
 		return IPV4;
-	case __constant_ntohs(ETH_P_IPV6):
+	case bpf_ntohs(ETH_P_IPV6):
 		return IPV6;
-	case __constant_ntohs(ETH_P_PPP_DISC):
-	case __constant_ntohs(ETH_P_PPP_SES):
+	case bpf_ntohs(ETH_P_PPP_DISC):
+	case bpf_ntohs(ETH_P_PPP_SES):
 		return PPPOE;
 	}
 
 	return INVALID;
 }
 
-static enum protocols parse_ip(uint8_t proto)
+static enum protocols parse_ip(u8 proto)
 {
 	switch (proto) {
 	case IPPROTO_ICMP:
@@ -97,7 +100,7 @@ int xdp_main(struct xdp_md *ctx)
 	enum protocols proto, ipproto = INVALID;
 	size_t plen = data_end - data + 1;
 	struct ethhdr *eth = data;
-	uint16_t ethproto;
+	u16 ethproto;
 
 	/* sanity check needed by the eBPF verifier */
 	if ((void *)(eth + 1) > data_end)
