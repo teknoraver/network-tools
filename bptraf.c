@@ -80,7 +80,7 @@ static int decimals(uint64_t n)
 	return 0;
 }
 
-static char* suffix(uint64_t n)
+static char *suffix(uint64_t n)
 {
 	if (n >= 9999500000)
 		return "G";
@@ -93,7 +93,7 @@ static char* suffix(uint64_t n)
 
 static void int_exit(int sig)
 {
-        LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
+	LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
 	bpf_xdp_detach(ifindex, 0, &opts);
 	exit(0);
 }
@@ -132,7 +132,7 @@ static void stats(int fd, useconds_t interval)
 
 	while (1) {
 		unsigned key = 0;
-                unsigned next_key = 0;
+		unsigned next_key = 0;
 
 		usleep(interval);
 		clock_gettime(CLOCK_MONOTONIC, &newts);
@@ -148,29 +148,35 @@ static void stats(int fd, useconds_t interval)
 				sum.bytes += values[i].bytes;
 			}
 			if (sum.packets > tot[key].packets) {
-				uint64_t pkts = (sum.packets - tot[key].packets) * B / deltat;
-				uint64_t bytes = (sum.bytes - tot[key].bytes) * 8 * B / deltat;
-				printf("%10s: %"H"pps %"H"bps\n",
-				       protocols[key], human(pkts), human(bytes));
+				uint64_t pkts =
+				    (sum.packets -
+				     tot[key].packets) * B / deltat;
+				uint64_t bytes =
+				    (sum.bytes -
+				     tot[key].bytes) * 8 * B / deltat;
+				printf("%10s: %" H "pps %" H "bps\n",
+				       protocols[key], human(pkts),
+				       human(bytes));
 			}
 			tot[key] = sum;
-                        key = next_key;
+			key = next_key;
 		}
 		oldts = newts;
 	}
 }
 
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+static void __attribute__((noreturn))usage(char *argv0, int ret)
 {
-	fprintf(ret ? stderr : stdout, "usage: %s [-d] [-i interval] iface\n", argv0);
+	fprintf(ret ? stderr : stdout, "usage: %s [-d] [-i interval] iface\n",
+		argv0);
 	exit(ret);
 }
 
 int main(int argc, char *argv[])
 {
-        LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
-        struct kernel_drop *skel_drop = NULL;
-        struct kernel_traf *skel_traf = NULL;
+	LIBBPF_OPTS(bpf_xdp_attach_opts, opts);
+	struct kernel_drop *skel_drop = NULL;
+	struct kernel_traf *skel_traf = NULL;
 	int interval = 1000000, c;
 	int fd;
 
@@ -183,21 +189,21 @@ int main(int argc, char *argv[])
 			interval = atof(optarg) * 1000000;
 			break;
 		case 'd':
-                        skel_drop = kernel_drop__open_and_load();
-                        if (!skel_drop) {
-                                fprintf(stderr, "failed to open BPF object\n");
-                                return 1;
-                        }
+			skel_drop = kernel_drop__open_and_load();
+			if (!skel_drop) {
+				fprintf(stderr, "failed to open BPF object\n");
+				return 1;
+			}
 			break;
 		}
 
-        if (!skel_drop) {
-                skel_traf = kernel_traf__open_and_load();
-                if (!skel_traf) {
-                        fprintf(stderr, "failed to open BPF object\n");
-                        return 1;
-                }
-        }
+	if (!skel_drop) {
+		skel_traf = kernel_traf__open_and_load();
+		if (!skel_traf) {
+			fprintf(stderr, "failed to open BPF object\n");
+			return 1;
+		}
+	}
 
 	if (optind != argc - 1)
 		usage(argv[0], 1);
@@ -205,17 +211,20 @@ int main(int argc, char *argv[])
 	ifindex = if_nametoindex(argv[optind]);
 	if (!ifindex) {
 		perror("if_nametoindex");
-                return 1;
+		return 1;
 	}
 
 	if (bpf_xdp_attach(ifindex,
-                           bpf_program__fd(skel_drop ? skel_drop->progs.xdp_main : skel_traf->progs.xdp_main),
-                           XDP_FLAGS_REPLACE, &opts) < 0) {
+			   bpf_program__fd(skel_drop ? skel_drop->progs.
+					   xdp_main : skel_traf->progs.
+					   xdp_main), XDP_FLAGS_REPLACE,
+			   &opts) < 0) {
 		printf("link set xdp fd failed\n");
 		return 1;
 	}
 
-        fd = bpf_map__fd(skel_drop ? skel_drop->maps.traf : skel_traf->maps.traf);
+	fd = bpf_map__fd(skel_drop ? skel_drop->maps.traf : skel_traf->maps.
+			 traf);
 
 	signal(SIGINT, int_exit);
 	signal(SIGTERM, int_exit);

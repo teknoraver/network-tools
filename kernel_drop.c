@@ -16,8 +16,8 @@
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
 	__type(key, unsigned int);
-	__type(value, struct trafdata);
-	__uint(max_entries, _MAX_PROTO);
+	 __type(value, struct trafdata);
+	 __uint(max_entries, _MAX_PROTO);
 } traf SEC(".maps");
 
 static void inc_stats(unsigned int key, int len)
@@ -33,8 +33,8 @@ static void inc_stats(unsigned int key, int len)
 SEC("xdp")
 int xdp_main(struct xdp_md *ctx)
 {
-	void *data_end = (void *)(uintptr_t)ctx->data_end;
-	void *data = (void *)(uintptr_t)ctx->data;
+	void *data_end = (void *)(uintptr_t) ctx->data_end;
+	void *data = (void *)(uintptr_t) ctx->data;
 
 	inc_stats(ALL, data_end - data + 1);
 

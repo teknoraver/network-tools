@@ -43,8 +43,8 @@
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
 	__type(key, unsigned int);
-	__type(value, struct trafdata);
-	__uint(max_entries, _MAX_PROTO);
+	 __type(value, struct trafdata);
+	 __uint(max_entries, _MAX_PROTO);
 } traf SEC(".maps");
 
 static void inc_stats(unsigned int key, int len)
@@ -95,8 +95,8 @@ static enum protocols parse_ip(u8 proto)
 SEC("xdp")
 int xdp_main(struct xdp_md *ctx)
 {
-	void *data_end = (void *)(uintptr_t)ctx->data_end;
-	void *data = (void *)(uintptr_t)ctx->data;
+	void *data_end = (void *)(uintptr_t) ctx->data_end;
+	void *data = (void *)(uintptr_t) ctx->data;
 	enum protocols proto, ipproto = INVALID;
 	size_t plen = data_end - data + 1;
 	struct ethhdr *eth = data;
@@ -119,28 +119,28 @@ int xdp_main(struct xdp_md *ctx)
 		inc_stats(proto, plen);
 
 	switch (proto) {
-	case IPV4: {
-		struct iphdr *iph = (struct iphdr *)(eth + 1);
+	case IPV4:{
+			struct iphdr *iph = (struct iphdr *)(eth + 1);
 
-		if ((void *)(iph + 1) > data_end)
+			if ((void *)(iph + 1) > data_end)
+				break;
+
+			ipproto = parse_ip(iph->protocol);
+			plen -= sizeof(*iph);
 			break;
+		}
+	case IPV6:{
+			struct ipv6hdr *ip6h = (struct ipv6hdr *)(eth + 1);
 
-		ipproto = parse_ip(iph->protocol);
-		plen -= sizeof(*iph);
-		break;
-	}
-	case IPV6: {
-		struct ipv6hdr *ip6h = (struct ipv6hdr *)(eth + 1);
+			if ((void *)(ip6h + 1) > data_end)
+				break;
 
-		if ((void *)(ip6h + 1) > data_end)
+			ipproto = parse_ip(ip6h->nexthdr);
+			plen -= sizeof(*ip6h);
 			break;
-
-		ipproto = parse_ip(ip6h->nexthdr);
-		plen -= sizeof(*ip6h);
-		break;
-	}
+		}
 	default:
-		   break;
+		break;
 	}
 
 	if (ipproto != INVALID)

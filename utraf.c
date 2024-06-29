@@ -71,7 +71,7 @@ static int decimals(uint64_t n)
 	return 0;
 }
 
-static char* suffix(uint64_t n)
+static char *suffix(uint64_t n)
 {
 	if (n >= 9999500000)
 		return "G";
@@ -82,9 +82,10 @@ static char* suffix(uint64_t n)
 	return "";
 }
 
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+static void __attribute__((noreturn))usage(char *argv0, int ret)
 {
-	fprintf(ret ? stderr : stdout, "usage: %s [-i interval] iface\n", argv0);
+	fprintf(ret ? stderr : stdout, "usage: %s [-i interval] iface\n",
+		argv0);
 	exit(ret);
 }
 
@@ -111,10 +112,10 @@ static int get_link_stats(struct rtnl_link_stats64 *stats, struct timespec *ts)
 			.nlmsg_type = RTM_GETLINK,
 			.nlmsg_flags = NLM_F_REQUEST,
 			.nlmsg_seq = 100,
-		},
+			},
 		.ifi = {
 			.ifi_family = ARPHRD_ETHER,
-		},
+			},
 	};
 
 	/* response */
@@ -126,7 +127,9 @@ static int get_link_stats(struct rtnl_link_stats64 *stats, struct timespec *ts)
 
 	req.ifi.ifi_index = ifindex;
 
-	readed = sendto(fd, &req, sizeof(req), 0, (struct sockaddr *)&sa, sizeof(sa));
+	readed =
+	    sendto(fd, &req, sizeof(req), 0, (struct sockaddr *)&sa,
+		   sizeof(sa));
 
 	if (readed < 0) {
 		perror("sendto");
@@ -157,8 +160,7 @@ static int get_link_stats(struct rtnl_link_stats64 *stats, struct timespec *ts)
 	}
 
 	for (rtalist_len = nlh->nlmsg_len - NLMSG_LENGTH(sizeof(*ifi));
-	     RTA_OK(rta, rtalist_len);
-	     rta = RTA_NEXT(rta, rtalist_len)) {
+	     RTA_OK(rta, rtalist_len); rta = RTA_NEXT(rta, rtalist_len)) {
 		if (rta->rta_type == IFLA_STATS64) {
 			struct rtnl_link_stats64 *st = RTA_DATA(rta);
 			*stats = *st;
@@ -215,7 +217,7 @@ int main(int argc, char *argv[])
 		txbps = (news.tx_bytes - olds.tx_bytes) * 8 * B / deltat;
 		rxbps = (news.rx_bytes - olds.rx_bytes) * 8 * B / deltat;
 
-		printf("tx: %"H"bps %"H"pps rx: %"H"bps %"H"pps\n",
+		printf("tx: %" H "bps %" H "pps rx: %" H "bps %" H "pps\n",
 		       human(txbps), human(txpps), human(rxbps), human(rxpps));
 
 		olds = news;

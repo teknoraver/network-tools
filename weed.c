@@ -41,9 +41,11 @@
 	(o3) <<  8 | \
 	(o4))
 
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+static void __attribute__((noreturn))usage(char *argv0, int ret)
 {
-	fprintf(stderr, "usage: %s [-v] [-d dstaddr] [-s srcaddr] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n", argv0);
+	fprintf(stderr,
+		"usage: %s [-v] [-d dstaddr] [-s srcaddr] [-i interval[u|m|s]] [-c count[k|m|g]] ifout ifin\n",
+		argv0);
 	exit(ret);
 }
 
@@ -72,7 +74,7 @@ static pthread_t th;
 /**
  * structure which represents a probe packet
  */
-struct __attribute__ ((packed)) frame {
+struct __attribute__((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
 	struct udphdr udp;
@@ -82,26 +84,28 @@ struct __attribute__ ((packed)) frame {
 
 static struct frame template = {
 	.ether = {
-		.ether_type = __constant_htons(ETHERTYPE_IP),
-	},
+		  .ether_type = __constant_htons(ETHERTYPE_IP),
+		  },
 	.ip = {
-		.version = 4,
-		.ihl = 5,
-		.tot_len = __constant_htons(sizeof(template.ip) + sizeof(template.udp) + sizeof(template.magic) + sizeof(template.ts)),
-		.id = __constant_htons(0xcda3),
-		.frag_off = 0x40,
-		.ttl = 64,
-		.protocol = IPPROTO_UDP,
-		.check = __constant_htons(0x41c1),
-		.saddr = ipv4_addr(192, 168, 85, 2),
-		.daddr = ipv4_addr(192, 168, 85, 1),
-	},
+	       .version = 4,
+	       .ihl = 5,
+	       .tot_len =
+	       __constant_htons(sizeof(template.ip) + sizeof(template.udp) +
+				sizeof(template.magic) + sizeof(template.ts)),
+	       .id = __constant_htons(0xcda3),
+	       .frag_off = 0x40,
+	       .ttl = 64,
+	       .protocol = IPPROTO_UDP,
+	       .check = __constant_htons(0x41c1),
+	       .saddr = ipv4_addr(192, 168, 85, 2),
+	       .daddr = ipv4_addr(192, 168, 85, 1),
+	       },
 	.udp = {
 		.source = __constant_htons(9),
 		.dest = __constant_htons(9),
 		.len = __constant_htons(8),
 		/* no checksum */
-	},
+		},
 	.magic = __constant_cpu_to_be64(0x5274742043616C63),
 };
 
@@ -200,7 +204,7 @@ static unsigned time_sub(struct timespec *since, struct timespec *to)
 		return to->tv_nsec - since->tv_nsec;
 
 	return (to->tv_sec - since->tv_sec) * 1000000000
-		+ to->tv_nsec - since->tv_nsec;
+	    + to->tv_nsec - since->tv_nsec;
 }
 
 /**
@@ -212,18 +216,15 @@ static void result(int sig)
 	pthread_join(th, NULL);
 
 	printf("%u packets transmitted, %u received, %u%% packet loss\n",
-		sent,
-		rx,
-		sent ? (sent - rx) * 100 / sent : 100);
+	       sent, rx, sent ? (sent - rx) * 100 / sent : 100);
 	if (rx) {
 		sum /= rx;
 		sum2 /= rx;
 		printf("eed min/avg/max/mdev = %.1f/%.1f/%.1f/%.1f us\n",
-			(float)min / 1000,
-			(float)sum / 1000,
-			(float)max / 1000,
-			(float)llsqrt(sum2 - sum * sum) / 1000
-		);
+		       (float)min / 1000,
+		       (float)sum / 1000,
+		       (float)max / 1000,
+		       (float)llsqrt(sum2 - sum * sum) / 1000);
 	}
 	exit(0);
 }
@@ -306,14 +307,14 @@ static int setup(int argc, char *argv[])
 			if (rand_daddr)
 				seed_mac(daddr.ether_addr_octet);
 			else if (!ether_aton_r(optarg, &daddr))
-					usage(argv[0], 1);
+				usage(argv[0], 1);
 			break;
 		case 's':
 			rand_saddr = !strcmp(optarg, "rand");
 			if (rand_saddr)
 				seed_mac(saddr.ether_addr_octet);
 			else if (!ether_aton_r(optarg, &saddr))
-					usage(argv[0], 1);
+				usage(argv[0], 1);
 			break;
 		case 'v':
 			verbose = 1;
@@ -332,7 +333,9 @@ static int setup(int argc, char *argv[])
 	if (sockout == -1)
 		return 1;
 
-	if (setsockopt(sockout, SOL_PACKET, PACKET_QDISC_BYPASS, (char *)&enable, sizeof(enable)) < 0) {
+	if (setsockopt
+	    (sockout, SOL_PACKET, PACKET_QDISC_BYPASS, (char *)&enable,
+	     sizeof(enable)) < 0) {
 		perror("setsockopt(PACKET_QDISC_BYPASS)");
 		return 1;
 	}
@@ -341,7 +344,9 @@ static int setup(int argc, char *argv[])
 	if (sockin == -1)
 		return 1;
 
-	if (setsockopt(sockin, SOL_SOCKET, SO_TIMESTAMPNS, (char *)&enable, sizeof(enable)) < 0) {
+	if (setsockopt
+	    (sockin, SOL_SOCKET, SO_TIMESTAMPNS, (char *)&enable,
+	     sizeof(enable)) < 0) {
 		perror("setsockopt(SO_TIMESTAMPNS)");
 		return 1;
 	}
@@ -356,7 +361,7 @@ static int setup(int argc, char *argv[])
 /**
  * calculate the eed of incoming packets
  */
-static void* eed_calc(void *ptr)
+static void *eed_calc(void *ptr)
 {
 	struct frame rxf;
 	unsigned long long eed;
@@ -376,10 +381,14 @@ static void* eed_calc(void *ptr)
 			.msg_controllen = sizeof(ctrl),
 		};
 
-		if (recvmsg(sockin, &msg, 0) == sizeof(template) && rxf.magic == template.magic) {
-			for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
-				if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SO_TIMESTAMPNS) {
-					struct timespec *rxts = (struct timespec *)CMSG_DATA(cmsg);
+		if (recvmsg(sockin, &msg, 0) == sizeof(template)
+		    && rxf.magic == template.magic) {
+			for (cmsg = CMSG_FIRSTHDR(&msg); cmsg;
+			     cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+				if (cmsg->cmsg_level == SOL_SOCKET
+				    && cmsg->cmsg_type == SO_TIMESTAMPNS) {
+					struct timespec *rxts =
+					    (struct timespec *)CMSG_DATA(cmsg);
 
 					eed = time_sub(&rxf.ts, rxts);
 
@@ -393,7 +402,8 @@ static void* eed_calc(void *ptr)
 					sum2 += eed * eed;
 
 					if (verbose)
-						printf("eed: %.1f us\n", (float)eed / 1000);
+						printf("eed: %.1f us\n",
+						       (float)eed / 1000);
 
 					rx++;
 				}

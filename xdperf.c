@@ -71,34 +71,35 @@
 /**
  * structure which represents a packet
  */
-struct __attribute__ ((packed)) frame {
+struct __attribute__((packed)) frame {
 	struct ether_header ether;
 	struct iphdr ip;
 	union {
 		struct icmphdr icmp;
 		struct udphdr udp;
 	};
-	char payload[ETH_DATA_LEN - sizeof(struct iphdr) - sizeof(struct udphdr)];
+	char payload[ETH_DATA_LEN - sizeof(struct iphdr) -
+		     sizeof(struct udphdr)];
 };
 
 static struct frame template = {
 	.ether = {
-		.ether_type = __constant_htons(ETHERTYPE_IP),
-	},
+		  .ether_type = __constant_htons(ETHERTYPE_IP),
+		  },
 	.ip = {
-		.version = 4,
-		.ihl = 5,
-		.id = __constant_htons(0xcda3),
-		.frag_off = 0x40,
-		.ttl = 64,
-		.protocol = IPPROTO_UDP,
-		.saddr = ipv4_addr(192, 168, 85, 2),
-		.daddr = ipv4_addr(192, 168, 85, 1),
-	},
+	       .version = 4,
+	       .ihl = 5,
+	       .id = __constant_htons(0xcda3),
+	       .frag_off = 0x40,
+	       .ttl = 64,
+	       .protocol = IPPROTO_UDP,
+	       .saddr = ipv4_addr(192, 168, 85, 2),
+	       .daddr = ipv4_addr(192, 168, 85, 1),
+	       },
 	.udp = {
 		.source = __constant_htons(36674),
 		.dest = __constant_htons(9),
-	},
+		},
 };
 
 enum {
@@ -133,7 +134,7 @@ static int opt_queue;
 		exit(1); \
 	} while (0)
 
-static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
+static void __attribute__((noreturn))usage(char *argv0, int ret)
 {
 	fprintf(stderr,
 		"usage: %s [-g][-s src-mac][-d dest-mac][-S src-ip][-D dst-ip][-l len] <iface>\n"
@@ -144,8 +145,7 @@ static void __attribute__ ((noreturn)) usage(char *argv0, int ret)
 		"\t\t-D: destination IP|random\n"
 		"\t\t-l: frame length\n"
 		"\t\t-i: ICMP mode\n"
-		"\t\t-n: send raw ethernet frames\n",
-		argv0);
+		"\t\t-n: send raw ethernet frames\n", argv0);
 	exit(ret);
 }
 
@@ -181,12 +181,15 @@ static int xsk_configure_socket(void)
 	if (ret)
 		err("xsk_socket__create() %s (%d)\n", strerror(-ret), -ret);
 
-	ret = xsk_ring_prod__reserve(&fq, XSK_RING_PROD__DEFAULT_NUM_DESCS, &idx);
+	ret =
+	    xsk_ring_prod__reserve(&fq, XSK_RING_PROD__DEFAULT_NUM_DESCS, &idx);
 	if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS)
 		err("%d != XSK_RING_PROD__DEFAULT_NUM_DESCS\n", ret);
 
 	for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS; i++, idx++)
-		*xsk_ring_prod__fill_addr(&fq, idx * XSK_UMEM__DEFAULT_FRAME_SIZE) = i;
+		*xsk_ring_prod__fill_addr(&fq,
+					  idx * XSK_UMEM__DEFAULT_FRAME_SIZE) =
+		    i;
 
 	xsk_ring_prod__submit(&fq, XSK_RING_PROD__DEFAULT_NUM_DESCS);
 
@@ -222,7 +225,7 @@ static void seed_mac(unsigned char *mac)
  */
 static int setup(int argc, char *argv[])
 {
-	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+	struct rlimit r = { RLIM_INFINITY, RLIM_INFINITY };
 	int c, i;
 	int ret;
 
@@ -248,8 +251,11 @@ static int setup(int argc, char *argv[])
 			datalen = atoi(optarg);
 			/* 4 extra byte for FCS */
 			if (datalen < ETH_ZLEN || datalen > ETH_FRAME_LEN)
-				err("datalen must be between %d and %d\n", ETH_ZLEN, ETH_FRAME_LEN);
-			datalen -= sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp);
+				err("datalen must be between %d and %d\n",
+				    ETH_ZLEN, ETH_FRAME_LEN);
+			datalen -=
+			    sizeof(template.ether) + sizeof(template.ip) +
+			    sizeof(template.udp);
 			break;
 		case 'g':
 			xdp_flags &= ~XDP_FLAGS_DRV_MODE;
@@ -273,7 +279,8 @@ static int setup(int argc, char *argv[])
 			 * An ethertype higher or equal to ETH_P_802_3_MIN is safe
 			 * to use as 1536 is an invalid frame size.
 			 */
-			template.ether.ether_type = __constant_htons(ETH_P_802_3_MIN);
+			template.ether.ether_type =
+			    __constant_htons(ETH_P_802_3_MIN);
 			memset(&template.ip, 0, sizeof(template) - ETH_HLEN);
 			break;
 		case 'h':
@@ -291,23 +298,29 @@ static int setup(int argc, char *argv[])
 		err("if_nametoindex(): %s\n", strerror(errno));
 
 	if (mode != MODE_RAW) {
-		template.ip.tot_len = htons(datalen + sizeof(template.ip) + sizeof(template.udp));
+		template.ip.tot_len =
+		    htons(datalen + sizeof(template.ip) + sizeof(template.udp));
 		if (mode == MODE_UDP)
-			template.udp.len = htons(datalen + sizeof(template.udp));
+			template.udp.len =
+			    htons(datalen + sizeof(template.udp));
 	}
 
 	if (rand_daddr)
 		seed_mac(template.ether.ether_dhost);
 	else
-		memcpy(template.ether.ether_dhost, daddr.ether_addr_octet, ETH_ALEN);
+		memcpy(template.ether.ether_dhost, daddr.ether_addr_octet,
+		       ETH_ALEN);
 	if (rand_saddr)
 		seed_mac(template.ether.ether_shost);
 	else
-		memcpy(template.ether.ether_shost, saddr.ether_addr_octet, ETH_ALEN);
+		memcpy(template.ether.ether_shost, saddr.ether_addr_octet,
+		       ETH_ALEN);
 
 	if (mode != MODE_RAW) {
 		template.ip.check = 0;
-		template.ip.check = ip_checksum((uint16_t *)&template.ip, template.ip.ihl * 2);
+		template.ip.check =
+		    ip_checksum((uint16_t *) & template.ip,
+				template.ip.ihl * 2);
 
 		for (i = 0; i < datalen; i++)
 			template.payload[i] = i;
@@ -316,11 +329,16 @@ static int setup(int argc, char *argv[])
 	if (setrlimit(RLIMIT_MEMLOCK, &r))
 		err("setrlimit(RLIMIT_MEMLOCK): %s\n", strerror(errno));
 
-	ret = posix_memalign(&buffer, getpagesize(), NUM_FRAMES * XSK_UMEM__DEFAULT_FRAME_SIZE);
+	ret =
+	    posix_memalign(&buffer, getpagesize(),
+			   NUM_FRAMES * XSK_UMEM__DEFAULT_FRAME_SIZE);
 	if (ret)
 		err("posix_memalign(): %d\n", ret);
 
-	ret = xsk_umem__create(&umem, buffer, NUM_FRAMES * XSK_UMEM__DEFAULT_FRAME_SIZE, &fq, &cq, NULL);
+	ret =
+	    xsk_umem__create(&umem, buffer,
+			     NUM_FRAMES * XSK_UMEM__DEFAULT_FRAME_SIZE, &fq,
+			     &cq, NULL);
 	if (ret)
 		err("xsk_umem__create(): %s\n", strerror(errno));
 
@@ -336,13 +354,18 @@ static int setup(int argc, char *argv[])
 		if (rand_saddr)
 			rand_mac(template.ether.ether_shost);
 
-		memcpy(xsk_umem__get_data(buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE),
-		       &template, sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp) + datalen);
+		memcpy(xsk_umem__get_data
+		       (buffer, i * XSK_UMEM__DEFAULT_FRAME_SIZE), &template,
+		       sizeof(template.ether) + sizeof(template.ip) +
+		       sizeof(template.udp) + datalen);
 		if (mode == MODE_PING) {
-			template.icmp.un.echo.sequence = htons(ntohs(template.icmp.un.echo.sequence) + 1);
+			template.icmp.un.echo.sequence =
+			    htons(ntohs(template.icmp.un.echo.sequence) + 1);
 			template.icmp.checksum = 0;
-			template.icmp.checksum = ip_checksum((uint16_t *)&template.icmp,
-							     (sizeof(template.icmp) + datalen) / sizeof(uint16_t));
+			template.icmp.checksum =
+			    ip_checksum((uint16_t *) & template.icmp,
+					(sizeof(template.icmp) +
+					 datalen) / sizeof(uint16_t));
 		}
 	}
 
@@ -391,8 +414,13 @@ int main(int argc, char *argv[])
 		if (xsk_ring_prod__reserve(&tx, BATCH_SIZE, &idx) == BATCH_SIZE) {
 
 			for (i = 0; i < BATCH_SIZE; i++) {
-				xsk_ring_prod__tx_desc(&tx, idx + i)->addr = (frame_nb + i) << XSK_UMEM__DEFAULT_FRAME_SHIFT;
-				xsk_ring_prod__tx_desc(&tx, idx + i)->len = sizeof(template.ether) + sizeof(template.ip) + sizeof(template.udp) + datalen;
+				xsk_ring_prod__tx_desc(&tx, idx + i)->addr =
+				    (frame_nb +
+				     i) << XSK_UMEM__DEFAULT_FRAME_SHIFT;
+				xsk_ring_prod__tx_desc(&tx, idx + i)->len =
+				    sizeof(template.ether) +
+				    sizeof(template.ip) + sizeof(template.udp) +
+				    datalen;
 			}
 
 			xsk_ring_prod__submit(&tx, BATCH_SIZE);
