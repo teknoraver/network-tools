@@ -7,8 +7,8 @@
  * 	ip link set dev lo xdp object kernel.o verbose
  */
 
-#include <stdint.h>
-#include <linux/bpf.h>
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
 
 #include "common.h"
